@@ -1,0 +1,181 @@
+﻿<?php
+
+use App\Models\Proyecto;
+use App\Models\User;
+use Livewire\Component;
+
+new class extends Component
+{
+    public function with()
+    {
+        return [
+            'totalProyectos' => Proyecto::count(),
+            'pendientes' => Proyecto::where('estado_validacion', 'pendiente')->count(),
+            'validados' => Proyecto::where('estado_validacion', 'aprobado')->count(),
+            'totalUsuarios' => User::count(),
+            'proyectosRecientes' => Proyecto::with(['comunidad', 'linea_investigacion'])
+                ->latest()
+                ->take(5)
+                ->get()
+        ];
+    }
+};
+?>
+
+<div>
+    <!-- Stat Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 mt-2">
+        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
+                    <i data-lucide="file-text" class="w-6 h-6"></i>
+                </div>
+                <span class="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Proyectos</span>
+            </div>
+            <div class="text-3xl font-black text-slate-800 italic tracking-tighter">{{ $totalProyectos }}</div>
+            <div class="text-xs text-slate-400 font-medium mt-1 uppercase tracking-widest italic">Expedientes totales</div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="p-2 bg-amber-50 rounded-lg text-amber-600">
+                    <i data-lucide="clock" class="w-6 h-6"></i>
+                </div>
+                <span class="text-sm font-medium text-slate-500 uppercase tracking-wider">Pendientes</span>
+            </div>
+            <div class="text-3xl font-black text-slate-800 italic tracking-tighter">{{ $pendientes }}</div>
+            <div class="text-xs text-amber-600 font-extrabold mt-1 uppercase tracking-widest italic flex items-center gap-1 animate-pulse">
+                <i data-lucide="alert-circle" class="w-3 h-3"></i> Por validar
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                    <i data-lucide="check-circle" class="w-6 h-6"></i>
+                </div>
+                <span class="text-sm font-medium text-slate-500 uppercase tracking-wider">Verificados</span>
+            </div>
+            <div class="text-3xl font-black text-slate-800 italic tracking-tighter">{{ $validados }}</div>
+            <div class="text-xs text-emerald-600 font-bold mt-1 uppercase tracking-widest italic">Listos y publicados</div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="p-2 bg-purple-50 rounded-lg text-purple-600">
+                    <i data-lucide="users" class="w-6 h-6"></i>
+                </div>
+                <span class="text-sm font-medium text-slate-500 uppercase tracking-wider">Usuarios</span>
+            </div>
+            <div class="text-3xl font-black text-slate-800 italic tracking-tighter">{{ $totalUsuarios }}</div>
+            <div class="text-xs text-slate-400 font-medium mt-1 uppercase tracking-widest italic">Registrados</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Recent Activity -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-50 flex items-center justify-between bg-white">
+                <h3 class="font-black text-slate-800 uppercase italic tracking-tighter">Proyectos Recientes</h3>
+                <a href="{{ route('proyectos.index') }}" class="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:underline italic flex items-center gap-1">
+                    Ver todos <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                </a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50/30 border-b border-slate-100">
+                        <tr class="text-slate-500 text-[10px] font-black uppercase tracking-widest italic">
+                            <th class="px-6 py-4">Proyecto</th>
+                            <th class="px-6 py-4">LÃ­nea de Inv.</th>
+                            <th class="px-6 py-4 text-center">Estado</th>
+                            <th class="px-6 py-4 text-right">Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-50">
+                        @forelse($proyectosRecientes as $reciente)
+                            <tr class="hover:bg-slate-50/50 transition-all group">
+                                <td class="px-6 py-5">
+                                    <p class="text-sm font-black text-slate-800 uppercase italic tracking-tighter group-hover:text-blue-600 transition-colors line-clamp-1">
+                                        {{ $reciente->titulo }}
+                                    </p>
+                                    <p class="text-[10px] font-bold text-slate-400 italic">{{ optional($reciente->comunidad)->nombre ?? 'Sin Comunidad' }}</p>
+                                </td>
+                                <td class="px-6 py-5">
+                                    <span class="text-xs font-semibold text-slate-500 italic">
+                                        {{ optional($reciente->linea_investigacion)->nombre_investigacion ?? 'N/A' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-5">
+                                    <div class="flex justify-center">
+                                        @if($reciente->estado_validacion == 'pendiente')
+                                            <span class="px-3 py-1 bg-amber-50 text-amber-600 border border-amber-100 text-[9px] font-black uppercase italic tracking-widest rounded-full">Pendiente</span>
+                                        @elseif($reciente->estado_validacion == 'aprobado')
+                                            <span class="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-black uppercase italic tracking-widest rounded-full">Validado</span>
+                                        @else
+                                            <span class="px-3 py-1 bg-rose-50 text-rose-600 border border-rose-100 text-[9px] font-black uppercase italic tracking-widest rounded-full">Rechazado</span>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="px-6 py-5 text-right">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase italic tracking-widest">
+                                        {{ $reciente->created_at->diffForHumans() }}
+                                    </span>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="4" class="px-6 py-12 text-center text-slate-300">
+                                    <div class="flex flex-col items-center gap-2 opacity-30">
+                                        <i data-lucide="database" class="w-12 h-12"></i>
+                                        <p class="text-sm font-black uppercase italic tracking-widest">No hay registros aÃºn</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden">
+            <div class="p-6 border-b border-slate-50 bg-white">
+                <h3 class="font-black text-slate-800 uppercase italic tracking-tighter">Acciones RÃ¡pidas</h3>
+            </div>
+            <div class="p-6 space-y-3 flex-1">
+                <a href="{{ route('proyectos.crear') }}" class="w-full flex items-center justify-between px-5 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 group">
+                    <span class="flex items-center gap-3">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        Registrar Proyecto
+                    </span>
+                    <i data-lucide="chevron-right" class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all"></i>
+                </a>
+                
+                @if(optional(auth()->user())->role == 'admin' || optional(auth()->user())->role == 'coordinador')
+                    <a href="{{ route('validaciones.index') }}" class="w-full flex items-center justify-between px-5 py-4 border-2 border-slate-50 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-all group">
+                        <span class="flex items-center gap-3">
+                            <i data-lucide="check-check" class="w-5 h-5 text-emerald-500"></i>
+                            Revisar Pendientes
+                        </span>
+                        <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[8px] italic font-black shadow-sm shadow-amber-200/50">{{ $pendientes }}</span>
+                    </a>
+                @endif
+
+                <div class="pt-6 mt-6 border-t border-slate-50">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 italic">Material de apoyo</p>
+                    <button class="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-slate-800 transition-colors text-xs font-bold italic group">
+                        <i data-lucide="file-text" class="w-5 h-5 group-hover:translate-y-0.5 transition-transform"></i>
+                        GuÃ­a de Usuario .PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+             lucide.createIcons();
+        });
+    </script>
+</div>
+

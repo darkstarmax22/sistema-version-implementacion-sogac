@@ -1,0 +1,37 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class Equipo extends RepositorioModel
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'nombre',
+        'codigo',
+        'anio',
+        'seccion',
+        'comunidad_id',
+        'coordinacion_id',
+        'estado_logico',
+    ];
+
+    public function comunidad()
+    {
+        return $this->belongsTo(Comunidad::class);
+    }
+
+    public function coordinacion()
+    {
+        return $this->belongsTo(Coordinacion::class);
+    }
+
+    public function estudiantes()
+    {
+        return $this->belongsToMany(User::class, 'equipo_estudiante', 'equipo_id', 'persona_id', 'id', 'usu_cedula')
+                    ->withPivot('role_id')
+                    ->withTimestamps();
+    }
+}

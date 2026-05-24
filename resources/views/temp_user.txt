@@ -1,0 +1,332 @@
+﻿<?php
+
+use App\Models\User;
+use App\Models\Rol;
+use Livewire\Component;
+use Livewire\WithPagination;
+use Illuminate\Support\Facades\Hash;
+
+new class extends Component
+{
+    use WithPagination;
+
+    public $name = '';
+    public $email = '';
+    public $password = '';
+    public $selectedRoles = [];
+    public $search = '';
+    public $editingUserId = null;
+    public $isModalOpen = false;
+
+    protected function rules()
+    {
+        return [
+            'name' => 'required|min:3|max:255',
+            'email' => 'required|email|unique:users,email,' . $this->editingUserId,
+            'password' => $this->editingUserId ? 'nullable|min:8' : 'required|min:8',
+            'selectedRoles' => 'required|array|min:1',
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'name.required' => 'El nombre es obligatorio.',
+            'name.min' => 'El nombre debe tener al menos 3 caracteres.',
+            'email.required' => 'El correo electrÃ³nico es obligatorio.',
+            'email.email' => 'El formato del correo es invÃ¡lido.',
+            'email.unique' => 'Este correo ya estÃ¡ registrado.',
+            'password.required' => 'La contraseÃ±a es obligatoria.',
+            'password.min' => 'La contraseÃ±a debe tener al menos 8 caracteres.',
+            'selectedRoles.required' => 'Debes seleccionar al menos un rol.',
+            'selectedRoles.min' => 'Debes seleccionar al menos un rol.',
+        ];
+    }
+
+    public function openModal($id = null)
+    {
+        $this->resetFields();
+        if ($id) {
+            $this->editingUserId = $id;
+            $user = User::with('roles')->find($id);
+            $this->name = $user->name;
+            $this->email = $user->email;
+            $this->selectedRoles = $user->roles->pluck('id')->map(fn($id) => (string) $id)->toArray();
+        }
+        $this->isModalOpen = true;
+    }
+
+    public function closeModal()
+    {
+        $this->isModalOpen = false;
+        $this->resetFields();
+    }
+
+    public function resetFields()
+    {
+        $this->name = '';
+        $this->email = '';
+        $this->password = '';
+        $this->selectedRoles = [];
+        $this->editingUserId = null;
+    }
+
+    public function save()
+    {
+        $this->validate();
+
+        $userData = [
+            'name' => $this->name,
+            'email' => $this->email,
+        ];
+
+        if ($this->password) {
+            $userData['password'] = Hash::make($this->password);
+        }
+
+        $user = User::updateOrCreate(
+            ['id' => $this->editingUserId],
+            $userData
+        );
+
+        // Sync roles in detalle_rol
+        // Assuming estado_logico 1 by default
+        $rolesToSync = [];
+        foreach ($this->selectedRoles as $roleId) {
+            $rolesToSync[$roleId] = ['estado_logico' => 1];
+        }
+        $user->roles()->sync($rolesToSync);
+
+        $this->closeModal();
+        session()->flash('message', $this->editingUserId ? 'Usuario actualizado con Ã©xito.' : 'Usuario creado con Ã©xito.');
+        $this->dispatch('refresh-icons');
+    }
+
+    public function delete($id)
+    {
+        if ($id == auth()->id()) {
+            session()->flash('error', 'No puedes eliminarte a ti mismo.');
+            return;
+        }
+        User::find($id)->delete();
+        session()->flash('message', 'Usuario eliminado permanentemente.');
+        $this->dispatch('refresh-icons');
+    }
+
+    public function toggleStatus($id)
+    {
+        if ($id == auth()->id()) {
+            session()->flash('error', 'No puedes inhabilitarte a ti mismo.');
+            return;
+        }
+        $user = User::find($id);
+        $user->update(['activo' => !$user->activo]);
+        
+        session()->flash('message', $user->activo ? 'Usuario habilitado correctamente.' : 'Usuario inhabilitado correctamente.');
+        $this->dispatch('refresh-icons');
+    }
+
+    public function with()
+    {
+        return [
+            'users' => User::with('roles')
+                        ->where(function($query) {
+                            $query->where('name', 'like', '%' . $this->search . '%')
+                                  ->orWhere('email', 'like', '%' . $this->search . '%');
+                        })
+                        ->latest()
+                        ->paginate(10),
+            'allRoles' => Rol::whereIn('nombre_rol', ['profesor', 'estudiante'])->get()
+        ];
+    }
+};
+?>
+
+<div>
+    <!-- Success Message -->
+    @if (session()->has('message'))
+        <div class="mb-4 p-4 bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl flex items-center gap-3 italic font-medium anim-fade-in shadow-sm">
+            <i data-lucide="info" class="w-5 h-5"></i>
+            {{ session('message') }}
+        </div>
+    @endif
+
+    @if (session()->has('error'))
+        <div class="mb-4 p-4 bg-rose-100 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-3 italic font-medium anim-fade-in shadow-sm">
+            <i data-lucide="alert-circle" class="w-5 h-5"></i>
+            {{ session('error') }}
+        </div>
+    @endif
+
+    <!-- Header Actions -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div class="relative flex-1 max-w-md">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <i data-lucide="search" class="w-5 h-5"></i>
+            </span>
+            <input wire:model.live="search" type="text" placeholder="Buscar usuario por nombre o correo..." 
+                   class="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none shadow-sm font-medium">
+        </div>
+        
+        <button wire:click="openModal" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2 active:scale-95 uppercase tracking-widest text-[10px]">
+            <i data-lucide="user-plus" class="w-5 h-5"></i>
+            Nuevo Usuario
+        </button>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200">
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic text-left">Usuario</th>
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic text-left">Roles</th>
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic text-center">Estado</th>
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest italic text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 italic">
+                    @foreach($users as $user)
+                        <tr class="hover:bg-slate-50/50 transition-all group {{ !$user->activo ? 'opacity-60 bg-slate-50/30' : '' }}">
+                            <td class="px-6 py-4">
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-bold {{ $user->activo ? 'text-slate-800' : 'text-slate-500' }} uppercase group-hover:text-blue-600 transition-colors">{{ $user->name }}</span>
+                                    <span class="text-xs text-slate-500 font-medium lowercase">{{ $user->email }}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach($user->roles as $role)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full {{ $user->activo ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-slate-100 text-slate-400 border-slate-200' }} border text-[10px] font-bold uppercase tracking-tighter italic">
+                                            {{ $role->nombre_rol }}
+                                        </span>
+                                    @endforeach
+                                    @if($user->roles->isEmpty())
+                                        <span class="text-xs text-slate-400 italic">Sin roles</span>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                @if($user->activo)
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-black uppercase tracking-widest italic shadow-sm">
+                                        Activo
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200 text-slate-500 border border-slate-300 text-[10px] font-black uppercase tracking-widest italic">
+                                        Inactivo
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="flex items-center justify-end gap-1">
+                                    <button wire:click="openModal({{ $user->id }})" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
+                                        <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                    </button>
+                                    
+                                    <button wire:click="toggleStatus({{ $user->id }})" 
+                                            class="p-2 {{ $user->activo ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50' }} rounded-lg transition-all" 
+                                            title="{{ $user->activo ? 'Inhabilitar' : 'Habilitar' }}">
+                                        <i data-lucide="{{ $user->activo ? 'user-minus' : 'user-check' }}" class="w-4 h-4"></i>
+                                    </button>
+
+                                    <button wire:click="delete({{ $user->id }})" 
+                                            wire:confirm="Â¿EstÃ¡s seguro de eliminar PERMANENTEMENTE este usuario?"
+                                            class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Eliminar Permanentemente">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforeach
+                    @if($users->isEmpty())
+                        <tr>
+                            <td colspan="4" class="px-6 py-20 text-center">
+                                <div class="flex flex-col items-center justify-center text-slate-300">
+                                    <i data-lucide="users" class="w-16 h-16 mb-4 opacity-20"></i>
+                                    <p class="text-lg font-bold italic">No se encontraron usuarios</p>
+                                    <p class="text-sm">Prueba con otros tÃ©rminos de bÃºsqueda</p>
+                                </div>
+                            </td>
+                        </tr>
+                    @endif
+                </tbody>
+            </table>
+        </div>
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100">
+            {{ $users->links() }}
+        </div>
+    </div>
+
+    <!-- Modal -->
+    @if($isModalOpen)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+            <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-md" wire:click="closeModal"></div>
+            
+            <div class="relative bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div class="p-8 border-b border-slate-100 flex items-center justify-between bg-white">
+                    <div>
+                        <h3 class="text-2xl font-extrabold text-slate-800 italic uppercase tracking-tighter">
+                            {{ $editingUserId ? 'Actualizar Usuario' : 'Nuevo Usuario' }}
+                        </h3>
+                        <p class="text-sm text-slate-500 font-medium">Gestiona el acceso al sistema</p>
+                    </div>
+                    <button wire:click="closeModal" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+
+                <form wire:submit="save" class="p-8 space-y-4">
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 mb-2 uppercase tracking-[0.2em] italic">Nombre Completo</label>
+                        <input wire:model="name" type="text" class="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all italic font-bold text-slate-700 placeholder:text-slate-300" placeholder="Ej: Juan PÃ©rez">
+                        @error('name') <span class="text-rose-500 text-xs mt-2 block font-bold italic">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 mb-2 uppercase tracking-[0.2em] italic">Correo ElectrÃ³nico</label>
+                        <input wire:model="email" type="email" class="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all italic font-bold text-slate-700 placeholder:text-slate-300" placeholder="correo@ejemplo.com">
+                        @error('email') <span class="text-rose-500 text-xs mt-2 block font-bold italic">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 mb-2 uppercase tracking-[0.2em] italic">ContraseÃ±a {{ $editingUserId ? '(dejar en blanco para mantener)' : '' }}</label>
+                        <input wire:model="password" type="password" class="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all italic font-bold text-slate-700 placeholder:text-slate-300" placeholder="********">
+                        @error('password') <span class="text-rose-500 text-xs mt-2 block font-bold italic">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 mb-2 uppercase tracking-[0.2em] italic text-left w-full">Asignar Roles</label>
+                        <div class="grid grid-cols-1 gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                            @foreach($allRoles as $role)
+                                <label class="flex items-center gap-3 cursor-pointer group">
+                                    <div class="relative flex items-center">
+                                        <input type="checkbox" wire:model="selectedRoles" value="{{ $role->id }}" class="peer h-5 w-5 appearance-none border-2 border-slate-200 rounded-lg checked:bg-blue-600 checked:border-blue-600 transition-all cursor-pointer">
+                                        <i data-lucide="check" class="absolute h-3.5 w-3.5 text-white left-0.5 opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"></i>
+                                    </div>
+                                    <span class="text-sm font-bold text-slate-600 group-hover:text-blue-600 transition-colors uppercase italic">{{ $role->nombre_rol }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        @error('selectedRoles') <span class="text-rose-500 text-xs mt-2 block font-bold italic">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div class="flex items-center gap-4 pt-4">
+                        <button type="button" wire:click="closeModal" class="flex-1 px-6 py-4 border-2 border-slate-100 text-slate-400 font-bold rounded-2xl hover:bg-slate-50 transition-all uppercase tracking-widest text-[10px]">Cancelar</button>
+                        <button type="submit" class="flex-1 px-6 py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 uppercase tracking-widest text-[10px] active:scale-95">
+                            {{ $editingUserId ? 'Guardar Cambios' : 'Crear Usuario' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('refresh-icons', () => {
+                setTimeout(() => lucide.createIcons(), 10);
+            });
+        });
+    </script>
+</div>

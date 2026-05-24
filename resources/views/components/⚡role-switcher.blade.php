@@ -1,0 +1,167 @@
+<?php
+
+use App\Services\UserRoleService;
+use Livewire\Component;
+
+new class extends Component
+{
+    /** @var list<array{key: string, label: string, slug: string, enabled: bool, active: bool}> */
+    public array $roleButtons = [];
+
+    public ?string $activeRoleLabel = null;
+
+    public ?string $loadingKey = null;
+
+    public function mount(UserRoleService $roleService): void
+    {
+        $this->refreshState($roleService);
+    }
+
+    protected function refreshState(UserRoleService $roleService): void
+    {
+        $user = auth()->user();
+        $this->roleButtons = $roleService->moduleRoleButtons($user);
+        $this->activeRoleLabel = $roleService->activeRoleLabel($user);
+    }
+
+    public function selectRole(string $moduleKey, UserRoleService $roleService): void
+    {
+        $this->loadingKey = $moduleKey;
+
+        $user = auth()->user();
+
+        if (! $roleService->setActiveRoleByModuleKey($user, $moduleKey)) {
+            $this->loadingKey = null;
+            session()->flash('error', 'No se pudo aplicar ese rol. Intente de nuevo.');
+            return;
+        }
+
+        $this->refreshState($roleService);
+        $this->loadingKey = null;
+        session()->flash('message', 'Acceso simulado como: ' . ($this->activeRoleLabel ?? '') . '. El menú y los módulos se comportan como ese rol.');
+    }
+};
+?>
+
+<style>
+    .rol-ventana {
+        max-width: 520px;
+        margin: 10px auto 24px;
+        border: 2px solid #8b0000;
+        border-radius: 10px;
+        background: #fafafa;
+        box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.15);
+        padding: 0;
+        overflow: hidden;
+    }
+    .rol-ventana-titulo {
+        background: linear-gradient(180deg, #e8e8e8 0%, #d4d4d4 100%);
+        border-bottom: 1px solid #999;
+        padding: 8px 14px;
+        font-weight: 900;
+        font-size: 14px;
+        text-align: center;
+        color: #000;
+    }
+    .rol-ventana-cuerpo {
+        padding: 20px 24px 24px;
+    }
+    .rol-botones {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-top: 8px;
+    }
+    .rol-boton {
+        display: block;
+        width: 100%;
+        min-height: 72px;
+        padding: 12px 10px;
+        font-family: Verdana, Arial, sans-serif;
+        font-size: 15px;
+        font-weight: 900;
+        text-align: center;
+        border: 2px solid #bcbcbc;
+        border-radius: 6px;
+        background: #e8e8e8;
+        color: #000;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .rol-boton:hover:not(:disabled) {
+        background: #d0d0d0;
+        border-color: #888;
+    }
+    .rol-boton--activo {
+        background: #8fc4cb;
+        border-color: #2c4760;
+        box-shadow: inset 0 0 0 1px #2c4760;
+    }
+    .rol-boton--activo::after {
+        content: ' ✓';
+    }
+    .rol-boton--cargando {
+        opacity: 0.7;
+        cursor: wait;
+    }
+    .rol-activo-badge {
+        text-align: center;
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: #2c4760;
+        font-weight: bold;
+    }
+</style>
+
+<div style="font-family: Verdana, Arial, sans-serif;">
+    @if (session()->has('message'))
+        <div style="background: #d4edda; color: #155724; padding: 10px; margin-bottom: 12px; border: 1px solid #c3e6cb; text-align: center; max-width: 520px; margin-left: auto; margin-right: auto;">
+            {{ session('message') }}
+        </div>
+    @endif
+
+    @if (session()->has('error'))
+        <div style="background: #f8d7da; color: #721c24; padding: 10px; margin-bottom: 12px; border: 1px solid #f5c6cb; text-align: center; max-width: 520px; margin-left: auto; margin-right: auto;">
+            {{ session('error') }}
+        </div>
+    @endif
+
+    <div class="rol-ventana">
+        <div class="rol-ventana-titulo">Simular acceso por rol</div>
+        <div class="rol-ventana-cuerpo">
+            @if ($activeRoleLabel)
+                <p class="rol-activo-badge">Accediendo como: {{ $activeRoleLabel }}</p>
+            @else
+                <p class="rol-activo-badge" style="color: #856404;">Elija un rol para simular su acceso en el sistema</p>
+            @endif
+
+            <p style="font-size: 12px; color: #555; text-align: center; margin: 0 0 4px;">
+                El sistema mostrará menús y permisos como si usted fuera ese rol.
+            </p>
+
+            <div class="rol-botones">
+                @foreach ($roleButtons as $btn)
+                    <button
+                        type="button"
+                        class="rol-boton {{ $btn['active'] ? 'rol-boton--activo' : '' }} {{ $loadingKey === $btn['key'] ? 'rol-boton--cargando' : '' }}"
+                        wire:click="selectRole({{ json_encode($btn['key']) }})"
+                        @if($loadingKey !== null) disabled @endif
+                        title="Simular acceso como {{ $btn['label'] }}"
+                    >
+                        @if ($loadingKey === $btn['key'])
+                            Aplicando…
+                        @else
+                            {{ $btn['label'] }}
+                        @endif
+                    </button>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 8px;">
+        <a href="{{ route('dashboard') }}" class="boton" style="display: inline-block; text-decoration: none; line-height: 30px; padding: 0 24px;">
+            Entrar al sistema con este rol
+        </a>
+    </div>
+</div>

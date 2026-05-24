@@ -1,0 +1,77 @@
+﻿<?php
+
+use Livewire\Component;
+use Illuminate\Support\Facades\Auth;
+
+new class extends Component
+{
+    public $email = '';
+    public $password = '';
+    public $error = '';
+
+    public function login()
+    {
+        if (Auth::attempt(['email' => $this->email, 'password' => $this->password])) {
+            return redirect()->intended('/dashboard');
+        }
+
+        $this->error = 'Credenciales no coinciden con nuestros registros.';
+    }
+};
+?>
+
+<div class="min-h-screen flex items-center justify-center bg-slate-900 p-6">
+    <div class="max-w-md w-full">
+        <!-- Logo/Title -->
+        <div class="text-center mb-10">
+            <div class="inline-flex items-center justify-center h-16 w-16 bg-blue-600 rounded-2xl shadow-lg mb-4">
+                <i data-lucide="database" class="w-8 h-8 text-white"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white tracking-tight">Repositorio UPT</h1>
+            <p class="text-slate-400 mt-2">Ingresa tus credenciales para continuar</p>
+        </div>
+
+        <!-- Form -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+            <form wire:submit="login" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Correo Institucional</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <i data-lucide="mail" class="w-5 h-5"></i>
+                        </span>
+                        <input wire:model="email" type="email" required class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" placeholder="usuario@upt.edu.ve">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">ContraseÃ±a</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <i data-lucide="lock" class="w-5 h-5"></i>
+                        </span>
+                        <input wire:model="password" type="password" required class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
+                    </div>
+                </div>
+
+                @if($error)
+                    <div class="text-rose-500 text-sm font-medium bg-rose-50 p-3 rounded-lg border border-rose-100 italic">
+                        {{ $error }}
+                    </div>
+                @endif
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all transform active:scale-95">
+                    Iniciar SesiÃ³n
+                </button>
+            </form>
+
+            <div class="mt-8 pt-6 border-t border-slate-100 text-center">
+                <p class="text-xs text-slate-400 uppercase font-bold tracking-widest mb-4">Usuarios demo disponibles</p>
+                <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-500 font-medium">
+                    <div class="p-2 bg-slate-50 rounded border border-slate-100">admin@upt.edu.ve (admin123)</div>
+                    <div class="p-2 bg-slate-50 rounded border border-slate-100">coord@upt.edu.ve (coord123)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
