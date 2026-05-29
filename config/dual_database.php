@@ -24,11 +24,13 @@ return [
         'inscripcion',
         'lapso_academico',
         'malla',
+        'programa',
         'trayecto',
         'semestre',
         'unidad_curricular',
         'rol',
         'grupo_proyecto_estudiante',
+        'grupo_proyecto',
     ],
 
     /*
@@ -46,24 +48,23 @@ return [
         'metodologia_investigacions',
         'tipo_investigacions',
         'tipo_publicacions',
-        'equipos',
-        'equipo_estudiante',
-        'auditorias',
+        'grupo_proyecto_modulo',
+        'profesor_proyecto_modulo',
         'roles',
         'direcciones',
+        'componentes',
+        'auditorias',
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Copia local en repositorio para doble lectura si intranet no responde
+    | Reglas de conexión (sin FK entre bases)
+    |--------------------------------------------------------------------------
+    | - intranet_tables: solo SELECT desde el módulo.
+    | - repositorio_tables: INSERT/UPDATE del módulo (proyectos, grupo_proyecto_modulo, etc.).
+    | - Espejo: solo intranet → simulación (IntranetSimulationMirrorService), bajo demanda.
+    | - Relación lapso/sección/cédula/EQGRP: en PHP (ConexionDualService), no en SQL entre BDs.
     |--------------------------------------------------------------------------
     */
-    'repositorio_mirror_tables' => [
-        'lapso_academico',
-    ],
-
-    'local_aliases' => [
-        'lapso_academico' => 'lapso_academico',
-    ],
 
 ];

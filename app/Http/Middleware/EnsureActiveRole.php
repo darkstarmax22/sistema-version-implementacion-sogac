@@ -20,6 +20,14 @@ class EnsureActiveRole
         $roleService = app(UserRoleService::class);
 
         if ($roleService->getActiveRole($user) !== null) {
+            if (! $roleService->rolActivoSigueSiendoValido($user)) {
+                $roleService->clearActiveRole();
+
+                return redirect()
+                    ->route('acceso-rol.index')
+                    ->with('message_error', 'Su rol en sesión ya no es válido (revise inscripción o asignación docente en intranet).');
+            }
+
             return $next($request);
         }
 

@@ -1,7 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Registro de Proyectos')
+@section('title', 'Gestión de Proyectos')
 @section('header', 'Archivo de Investigaciones')
+
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('css/proyectos-gestion.css') }}">
+@endpush
 
 @section('content')
     <livewire:proyecto-manager />

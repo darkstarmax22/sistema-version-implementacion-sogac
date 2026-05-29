@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\DbHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Models\User;
+use App\Services\IntranetSimulationMirrorService;
 use App\Services\UserRoleService;
 
 class MagicLoginController extends Controller
@@ -50,12 +53,12 @@ class MagicLoginController extends Controller
      */
     public function login(Request $request)
     {
-        $ticket = $request->query('payload');
+        $ticket = $request->query('token') ?? $request->query('payload');
 
         if (empty($ticket)) {
             return response('<html><body style="font-family:Verdana;text-align:center;padding:80px;background:#f5f5f5;">
                 <h1 style="color:#c00;">Acceso Denegado</h1>
-                <p>No se proporcionó un enlace de acceso válido.</p>
+                <p>No se proporcion? un enlace de acceso v?lido.</p>
             </body></html>', 403);
         }
 
@@ -64,8 +67,8 @@ class MagicLoginController extends Controller
 
         if (!$payload || !isset($payload['cedula'], $payload['fecha_creacion'], $payload['firma_validacion'])) {
             return response('<html><body style="font-family:Verdana;text-align:center;padding:80px;background:#f5f5f5;">
-                <h1 style="color:#c00;">Enlace Inválido</h1>
-                <p>El enlace de acceso no es válido o fue manipulado.</p>
+                <h1 style="color:#c00;">Enlace Inv?lido</h1>
+                <p>El enlace de acceso no es v?lido o fue manipulado.</p>
             </body></html>', 403);
         }
 
@@ -76,27 +79,32 @@ class MagicLoginController extends Controller
 
         if (!hash_equals($firmaEsperada, $payload['firma_validacion'])) {
             return response('<html><body style="font-family:Verdana;text-align:center;padding:80px;background:#f5f5f5;">
-                <h1 style="color:#c00;">Enlace Inválido</h1>
-                <p>La firma del enlace no es válida.</p>
+                <h1 style="color:#c00;">Enlace Inv?lido</h1>
+                <p>La firma del enlace no es v?lida.</p>
             </body></html>', 403);
         }
 
-        // 3. Verificar expiración del enlace (por defecto 1 día; la sesión web es independiente y más larga)
+        // 3. Verificar expiraci?n del enlace (por defecto 1 d?a; la sesi?n web es independiente y m?s larga)
         $ttl = (int) config('app.magic_link_ttl', 86400);
         $elapsed = time() - (int) $payload['fecha_creacion'];
         if ($elapsed > $ttl || $elapsed < 0) {
             $horas = (int) round($ttl / 3600);
             return response('<html><body style="font-family:Verdana;text-align:center;padding:80px;background:#f5f5f5;">
                 <h1 style="color:#c00;">Enlace Expirado</h1>
-                <p>Este enlace de acceso ha expirado (válido por ' . $horas . ' horas). Genere uno nuevo desde la terminal.</p>
+                <p>Este enlace de acceso ha expirado (v?lido por ' . $horas . ' horas). Genere uno nuevo desde la terminal.</p>
             </body></html>', 403);
         }
 
         $cedula = trim($payload['cedula']);
 
         try {
-            // 4. Buscar usuario en BD externa
-            $user = User::whereRaw('TRIM(usu_cedula) = ?', [$cedula])->first();
+            // 4. Buscar usuario en BD externa con fallback automático a simulación.
+            $connection = DbHelper::connection();
+            $user = User::on($connection)->whereRaw('TRIM(usu_cedula) = ?', [$cedula])->first();
+
+            if (! $user && $connection === 'intranet') {
+                $user = User::on('simulacion')->whereRaw('TRIM(usu_cedula) = ?', [$cedula])->first();
+            }
 
             if (!$user) {
                 return response('<html><body style="font-family:Verdana;text-align:center;padding:80px;background:#f5f5f5;">
@@ -106,13 +114,24 @@ class MagicLoginController extends Controller
             }
 
             // 5. Login
-            Auth::login($user);
-
-            // 6. Regenerar sesión
+            // 6. Regenerar sesión primero para evitar session fixation attacks y asegurar persistencia
             $request->session()->regenerate();
 
+            Auth::login($user);
+            Log::info('User authenticated: ' . Auth::check() ? 'true' : 'false');
+
+            app(IntranetSimulationMirrorService::class)->mirrorUserContext($cedula);
+
+            // 6. Regenerar sesión
+
             $roleService = app(UserRoleService::class);
-            $roleService->bootstrapSessionRole($user);
+
+            // 7. Aplicar pre-rol si viene en el payload, si no usar el predeterminado
+            if (isset($payload['pre_role']) && $payload['pre_role']) {
+                $roleService->setActiveRole($user, $payload['pre_role']);
+            } else {
+                $roleService->bootstrapSessionRole($user);
+            }
 
             if ($roleService->getActiveRole($user) === null) {
                 return redirect()->route('acceso-rol.index');
@@ -122,7 +141,7 @@ class MagicLoginController extends Controller
 
         } catch (\Exception $e) {
             return response('<html><body style="font-family:Verdana;text-align:center;padding:80px;background:#f5f5f5;">
-                <h1 style="color:#c00;">Error de Conexión</h1>
+                <h1 style="color:#c00;">Error de Conexi?n</h1>
                 <p>' . $e->getMessage() . '</p>
             </body></html>', 500);
         }

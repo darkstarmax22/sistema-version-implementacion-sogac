@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 class Coordinacion extends RepositorioModel
 {
-    protected $table = 'coordinaciones';
+    use HasFactory;
 
-    protected $fillable = ['nombre', 'descripcion', 'activo', 'alertar_comunidades'];
-
-    protected $casts = [
-        'activo' => 'boolean',
-        'alertar_comunidades' => 'boolean',
+    protected $table = 'coordinaciones'; // Asumiendo que la tabla se llama 'coordinaciones'
+    protected $fillable = [
+        'nombre',
+        'activo', // Asumiendo que tiene un campo 'activo'
     ];
+
+    // Puedes añadir relaciones o métodos adicionales aquí si son necesarios
 }

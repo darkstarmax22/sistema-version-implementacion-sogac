@@ -16,6 +16,7 @@ return [
             'calificacion' => 'pry_calificacion',
             'fecha_aprobacion' => 'pry_fecha_aprobacion',
             'archivo_path' => 'pry_archivo_path',
+            'documentos' => 'pry_documentos',
             'linea_investigacion_id' => 'lin_codigo',
             'metodologia_id' => 'mei_codigo',
             'tipo_publicacion_id' => 'tpu_codigo',
@@ -24,6 +25,7 @@ return [
             'estado_validacion' => 'pry_estado_',
             'motivo_rechazo' => 'pry_motivo_rechazo',
             'comunidad_id' => 'com_codigo',
+            'equipo_ref' => 'pry_direccion_logica',
         ],
         'values' => [
             'estado_validacion' => [
@@ -53,6 +55,8 @@ return [
             'nombre_investigacion' => 'lin_nombre_investigacion',
             'descripcion' => 'lin_descripcion',
             'area_de_investigacion' => 'lin_area_de_investigacion',
+            'coordinacion_id' => 'coord_codigo',
+            'activo' => 'lin_estado',
         ],
         'values' => [
             'activo' => [
@@ -91,6 +95,32 @@ return [
             'nombre' => 'tin_nombre',
             'descripcion' => 'tin_descripcion',
             'estado_logico' => 'tin_estado_logico',
+        ],
+    ],
+
+    'componentes' => [
+        'primary_key' => 'comp_codigo',
+        'columns' => [
+            'id' => 'comp_codigo',
+            'nombre' => 'comp_nombre',
+            'coordinacion_id' => 'coord_codigo',
+            'anio' => 'comp_anio',
+            'es_obligatorio' => 'comp_es_obligatorio',
+            'estado_logico' => 'comp_estado_logico',
+        ],
+        'values' => [
+            'es_obligatorio' => [
+                true => 1,
+                false => 0,
+                1 => 1,
+                0 => 0,
+            ],
+            'estado_logico' => [
+                true => 1,
+                false => 0,
+                1 => 1,
+                0 => 0,
+            ],
         ],
     ],
 

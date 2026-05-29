@@ -1,8 +1,7 @@
 <?php
 
 use App\Models\Comunidad;
-use App\Models\User;
-use App\Models\Role;
+use App\Services\IntranetProfessorService;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -10,262 +9,181 @@ new class extends Component
 {
     use WithPagination;
 
-    public $search = '';
-    public $viewMode = 'list';
-    public $editingId = null;
+    public string $search = '';
 
-    // Comunidad fields
-    public $nombre = '';
-    public $direccion_exacta = '';
-    public $rif = '';
-    public $correo = '';
-    public $numero_telefono = '';
-    public $estado_id = '';
-    public $municipio_id = '';
-    public $fecha_registro = '';
+    public string $viewMode = 'list';
 
-    public $contactos = [];
-    public $nuevo_contacto_nombre = '';
-    public $nuevo_contacto_role_id = '';
-    public $nuevo_contacto_telefono = '';
-    public $nuevo_contacto_correo = '';
+    public ?int $editingId = null;
 
+    public string $nombre = '';
 
+    public string $direccion = '';
 
-    protected $rules = [
-        'nombre' => 'required|string|max:255',
-        'rif' => 'required|string|max:50',
-        'direccion_exacta' => 'required|string',
-        'correo' => 'required|email|max:150',
-        'numero_telefono' => 'required|string|max:20',
-        'estado_id' => 'required|exists:estados,id',
-        'municipio_id' => 'required|exists:municipios,id',
-    ];
+    public string $rif = '';
 
-    protected $messages = [
-        'nombre.required' => 'El nombre de la comunidad es obligatorio',
-        'rif.required' => 'El RIF es obligatorio',
-        'correo.required' => 'El correo es obligatorio',
-        'numero_telefono.required' => 'El teléfono es obligatorio',
-        'estado_id.required' => 'El estado es obligatorio',
-        'municipio_id.required' => 'El municipio es obligatorio',
-    ];
+    public string $correo = '';
 
-    public function updatedEstadoId()
+    public string $numero_telefono = '';
+
+    public string $prefijo_telefono = '0424';
+
+    public string $anio = '';
+
+    protected function rules(): array
     {
-        $this->municipio_id = '';
+        return [
+            'nombre' => 'required|string|max:255',
+            'rif' => 'nullable|string|max:50',
+            'direccion' => 'required|string|max:500',
+            'correo' => 'required|email|max:150',
+            'prefijo_telefono' => 'required|in:0424,0414,0412,0422,0416,0426',
+            'numero_telefono' => 'required|digits:7',
+            'anio' => 'nullable|string|max:32',
+        ];
     }
 
-    public function updatingSearch() { $this->resetPage(); }
-
-    public function create()
+    protected function messages(): array
     {
-        $this->reset(['editingId', 'nombre', 'direccion_exacta', 'rif', 'correo', 'numero_telefono', 'estado_id', 'municipio_id', 'contactos']);
+        return [
+            'nombre.required' => 'El nombre de la comunidad es obligatorio',
+            'direccion.required' => 'La dirección es obligatoria',
+            'correo.required' => 'El correo es obligatorio',
+            'prefijo_telefono.required' => 'El prefijo del teléfono es obligatorio',
+            'numero_telefono.required' => 'El teléfono es obligatorio',
+            'numero_telefono.digits' => 'El teléfono debe tener 7 dígitos.',
+        ];
+    }
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function puedeGestionar(): bool
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasRole('administrador', 'coordinador')) {
+            return true;
+        }
+
+        if ($user->hasRole('profesor proyecto')) {
+            return app(IntranetProfessorService::class)
+                ->esProfesorProyectoVigente(trim((string) $user->usu_cedula));
+        }
+
+        return false;
+    }
+
+    public function create(): void
+    {
+        // Temporalmente deshabilitado para depuración: if (! $this->puedeGestionar()) {
+        //     session()->flash('message_error', 'No tiene permiso para registrar comunidades.');
+        //     return;
+        // }
+
+        \Log::info('create method called, viewMode set to form');
+
+        $this->reset(['editingId', 'nombre', 'direccion', 'rif', 'correo', 'numero_telefono', 'prefijo_telefono', 'anio']);
+        $this->prefijo_telefono = '0424';
         $this->resetValidation();
-        $this->fecha_registro = now()->format('Y-m-d');
+
+        $cfg = auth()->user()?->profesorProyectoModulo();
+        if ($cfg && ! empty($cfg->ppm_anio)) {
+            $this->anio = (string) $cfg->ppm_anio;
+        }
+
         $this->viewMode = 'form';
         $this->dispatch('refresh-icons');
     }
 
-    public function edit($id)
+    public function edit(int $id): void
     {
+        if (! $this->puedeGestionar()) {
+            session()->flash('message_error', 'No tiene permiso para editar comunidades.');
+
+            return;
+        }
+
         $this->resetValidation();
-        $comunidad = Comunidad::with('direccion.municipio.estado', 'contactos.cargo')->findOrFail($id);
+        $comunidad = Comunidad::findOrFail($id);
         $this->editingId = $id;
         $this->nombre = $comunidad->nombre;
         $this->rif = $comunidad->rif;
         $this->correo = $comunidad->correo;
-        $this->numero_telefono = $comunidad->numero_telefono;
-        $this->fecha_registro = $comunidad->fecha_registro ? date('Y-m-d', strtotime($comunidad->fecha_registro)) : '';
-
-        if ($comunidad->direccion) {
-            $this->direccion_exacta = $comunidad->direccion->direccion_exacta;
-            $this->municipio_id = $comunidad->direccion->municipio_id;
-            $this->estado_id = $comunidad->direccion->municipio->estado_id;
+        
+        // Split phone number into prefix and rest
+        $telefonoCompleto = $comunidad->numero_telefono;
+        $prefijos = ['0424', '0414', '0412', '0422', '0416', '0426'];
+        $this->prefijo_telefono = '0424';
+        $this->numero_telefono = $telefonoCompleto;
+        
+        foreach ($prefijos as $prefijo) {
+            if (str_starts_with($telefonoCompleto, $prefijo)) {
+                $this->prefijo_telefono = $prefijo;
+                $this->numero_telefono = substr($telefonoCompleto, strlen($prefijo));
+                break;
+            }
         }
-
-        $this->contactos = $comunidad->contactos->map(function($c) {
-            return [
-                'nombre' => $c->nombre,
-                'role_id' => $c->role_id,
-                'telefono' => $c->telefono,
-                'correo' => $c->correo,
-                'cargo_nombre' => $c->cargo->tipo_de_rol ?? 'Desconocido'
-            ];
-        })->toArray();
-
-
+        
+        $this->direccion = $comunidad->direccion ?? '';
+        $this->anio = $comunidad->anio ?? '';
         $this->viewMode = 'form';
         $this->dispatch('refresh-icons');
     }
 
-    public function save()
+    public function save(): void
     {
+        if (! $this->puedeGestionar()) {
+            session()->flash('message_error', 'No tiene permiso para guardar comunidades.');
+
+            return;
+        }
+
         $this->validate();
 
-        $comunidadExistente = Comunidad::find($this->editingId);
-
-        $direccionRecord = \App\Models\Direccion::updateOrCreate(
-            ['id' => $comunidadExistente?->direccion_id],
-            [
-                'municipio_id' => $this->municipio_id,
-                'direccion_exacta' => $this->direccion_exacta,
-            ]
-        );
-
-        $datosPayload = [
+        $payload = [
             'nombre' => $this->nombre,
             'rif' => $this->rif,
             'correo' => $this->correo,
-            'numero_telefono' => $this->numero_telefono,
-            'direccion_id' => $direccionRecord->id,
-            'fecha_registro' => $this->fecha_registro ?: null,
+            'numero_telefono' => $this->prefijo_telefono . $this->numero_telefono,
+            'direccion' => $this->direccion,
+            'anio' => $this->anio !== '' ? $this->anio : null,
         ];
 
-        if (!$this->editingId && auth()->user()->hasRole('profesor proyecto')) {
-            $roleData = auth()->user()->roles()->where('nombre', 'profesor proyecto')->first();
-            if ($roleData) {
-                $datosPayload['anio'] = $roleData->pivot->anio;
-                $datosPayload['profesor_id'] = auth()->id();
-                $datosPayload['coordinacion_id'] = $roleData->pivot->coordinacion_id;
-            }
-        }
+        Comunidad::guardar($payload, $this->editingId);
 
-        $comunidad = Comunidad::updateOrCreate(
-            ['id' => $this->editingId],
-            $datosPayload
-        );
-
-        $comunidad->contactos()->delete();
-        foreach($this->contactos as $c) {
-            $comunidad->contactos()->create([
-                'nombre' => $c['nombre'],
-                'role_id' => $c['role_id'],
-                'telefono' => $c['telefono'],
-                'correo' => $c['correo']
-            ]);
-        }
-
-
-
-        session()->flash('message', 'Comunidad guardada exitosamente.');
+        session()->flash('message', 'Comunidad guardada correctamente.');
         $this->viewMode = 'list';
         $this->dispatch('refresh-icons');
     }
 
-    public function toggleStatus($id)
-    {
-        $item = Comunidad::find($id);
-        if ($item) {
-            $item->update(['activa' => !$item->activa]);
-            session()->flash('message', 'Estado de la comunidad actualizado.');
-            $this->dispatch('refresh-icons');
-        }
-    }
-
-    public function cancel()
+    public function cancel(): void
     {
         $this->viewMode = 'list';
         $this->dispatch('refresh-icons');
     }
 
-    public function addContacto()
+    public function with(): array
     {
-        $this->validate([
-            'nuevo_contacto_nombre' => 'required',
-            'nuevo_contacto_role_id' => 'required',
-        ], [
-            'nuevo_contacto_nombre.required' => 'El nombre del contacto es obligatorio',
-            'nuevo_contacto_role_id.required' => 'El cargo es obligatorio',
-        ]);
+        $termino = trim($this->search);
 
-        $rol = Role::find($this->nuevo_contacto_role_id);
-
-        $this->contactos[] = [
-            'nombre' => $this->nuevo_contacto_nombre,
-            'role_id' => $this->nuevo_contacto_role_id,
-            'telefono' => $this->nuevo_contacto_telefono,
-            'correo' => $this->nuevo_contacto_correo,
-            'cargo_nombre' => $rol ? $rol->tipo_de_rol : 'Desconocido'
-        ];
-
-        $this->reset(['nuevo_contacto_nombre', 'nuevo_contacto_role_id', 'nuevo_contacto_telefono', 'nuevo_contacto_correo']);
-        $this->dispatch('contactoAdded'); 
-    }
-
-    public function removeContacto($index)
-    {
-        unset($this->contactos[$index]);
-        $this->contactos = array_values($this->contactos);
-    }
-    public function toggleAlertaCoordinacion()
-    {
-        $coordRole = auth()->user()->roles()->whereIn('nombre', ['coordinador', 'COORDINADOR_Coordinación_TEMP_PLACEHOLDER'])->first();
-        if ($coordRole && $coordRole->pivot->coordinacion_id) {
-            $coordinacion = \App\Models\Coordinacion::find($coordRole->pivot->coordinacion_id);
-            if ($coordinacion) {
-                $coordinacion->alertar_comunidades = !$coordinacion->alertar_comunidades;
-                $coordinacion->save();
-            }
-        }
-        $this->dispatch('refresh-icons');
-    }
-
-    public function with()
-    {
-        $alertaAsesor = false;
-        $alertaCoordinador = false;
-
-        if (auth()->user()->hasRole('profesor proyecto')) {
-            $profRole = auth()->user()->roles()->where('nombre', 'profesor proyecto')->first();
-            if ($profRole && $profRole->pivot->coordinacion_id) {
-                $coordinacion = \App\Models\Coordinacion::find($profRole->pivot->coordinacion_id);
-                $alertaAsesor = $coordinacion ? $coordinacion->alertar_comunidades : false;
-            }
-        }
-
-        if (auth()->user()->hasRole('coordinador', 'COORDINADOR_Coordinación_TEMP_PLACEHOLDER')) {
-            $coordRole = auth()->user()->roles()->whereIn('nombre', ['coordinador', 'COORDINADOR_Coordinación_TEMP_PLACEHOLDER'])->first();
-            if ($coordRole && $coordRole->pivot->coordinacion_id) {
-                $coordinacion = \App\Models\Coordinacion::find($coordRole->pivot->coordinacion_id);
-                $alertaCoordinador = $coordinacion ? $coordinacion->alertar_comunidades : false;
-            }
-        }
-
-        $municipios_list = [];
-        if (!empty($this->estado_id)) {
-            $municipios_list = \App\Models\Municipio::where('estado_id', $this->estado_id)->orderBy('nombre')->get();
-        }
+        $comunidades = Comunidad::query()
+            ->when($termino !== '', function ($q) use ($termino) {
+                $q->where('nombre', 'like', '%' . $termino . '%')
+                    ->orWhere('rif', 'like', '%' . $termino . '%')
+                    ->orWhere('direccion', 'like', '%' . $termino . '%');
+            })
+            ->orderByDesc('id')
+            ->paginate(10);
 
         return [
-            'alertaAsesor' => $alertaAsesor,
-            'alertaCoordinador' => $alertaCoordinador,
-            'estados' => \App\Models\Estado::orderBy('nombre')->get(),
-            'municipios' => $municipios_list,
-            'roles_sistema' => \App\Models\Role::whereNotIn('tipo_de_rol', ['lider', 'autor'])->orderBy('tipo_de_rol')->get(),
-            'comunidades' => Comunidad::with(['coordinacion', 'profesor', 'direccion.municipio.estado'])->where(function($q) {
-                                          $q->where('nombre', 'like', "%{$this->search}%")
-                                            ->orWhere('rif', 'like', "%{$this->search}%");
-                                      })
-                                      ->when(!auth()->user()->hasRole('administrador'), function($query) {
-                                          if (auth()->user()->hasRole('profesor proyecto')) {
-                                              $query->where('profesor_id', auth()->id());
-                                          } else {
-                                              $query->where(function($q) {
-                                                  $q->whereHas('equipos.estudiantes', function($q2) {
-                                                      $q2->where('persona_id', auth()->id());
-                                                  });
-                                                  if (auth()->user()->hasRole('coordinador', 'COORDINADOR_Coordinación_TEMP_PLACEHOLDER')) {
-                                                      $coordRole = auth()->user()->roles()->whereIn('nombre', ['coordinador', 'COORDINADOR_Coordinación_TEMP_PLACEHOLDER'])->first();
-                                                      if ($coordRole && $coordRole->pivot->coordinacion_id) {
-                                                          $q->orWhere('coordinacion_id', $coordRole->pivot->coordinacion_id);
-                                                      }
-                                                  }
-                                              });
-                                          }
-                                      })
-                                      ->latest()
-                                      ->paginate(10),
+            'comunidades' => $comunidades,
+            'puedeGestionar' => $this->puedeGestionar(),
+            'lapsoVigente' => app(IntranetProfessorService::class)->lapsosActivos()->first(),
         ];
     }
 };
@@ -274,264 +192,155 @@ new class extends Component
 <div>
     <h2 class="titulo" style="margin-bottom: 20px; font-weight: bolder; margin-top: 10px;">Gestión de Comunidades</h2>
 
-    @if(isset($alertaAsesor) && $alertaAsesor)
-        <div style="background-color: #f8d7da; color: #721c24; border: 2px dashed #f5c6cb; padding: 10px; margin-bottom: 15px; border-radius: 4px; font-size:13px; font-weight:bold; text-align:center; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1)); cursor: default;">
-            ⚠ ¡ATENCIÓN! La COORDINACION_DE_Coordinación_TITLE_TEMP_PLACEHOLDER solicita urgentemente el registro y actualización de sus Comunidades.
-        </div>
-    @endif
+    <p style="font-size: 10px; color: #555; margin-bottom: 12px;">
+        Datos en tabla <b>comunidades</b> del repositorio. Los contactos por cargo (autoridad / personal vinculado) se registran en el campo dirección hasta existir tablas dedicadas.
+        @if($lapsoVigente)
+        Lapso vigente intranet: <b>{{ $lapsoVigente->lap_nombre }}</b>.
+        @endif
+    </p>
 
     @if (session()->has('message'))
-        <div style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 10px; margin-bottom: 15px; border-radius: 4px; font-size:12px;">
-            {{ session('message') }}
-        </div>
+    <div style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 10px; margin-bottom: 15px; border-radius: 4px; font-size:12px;">
+        {{ session('message') }}
+    </div>
+    @endif
+
+    @if (session()->has('message_error'))
+    <div style="background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 10px; margin-bottom: 15px; border-radius: 4px; font-size:12px;">
+        {{ session('message_error') }}
+    </div>
     @endif
 
     @if($viewMode === 'list')
-        <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 10px; margin-bottom: 20px;">
-            <legend style="color: #000; font-weight: bold; font-style: italic; padding: 0 5px;">Buscador y Listado</legend>
-            <table width="100%" border="0" cellpadding="4" cellspacing="0" style="font-size: 11px;">
-                <tr>
-                    <td width="30%"><b>Buscar Sector/RIF:</b></td>
-                    <td width="50%">
-                        <input wire:model.live="search" type="text" style="width: 90%; padding: 3px;" placeholder="...">
-                    </td>
-                    <td width="30%" align="right">
-                        @if(isset($alertaCoordinador) && auth()->user()->hasRole('coordinador', 'COORDINADOR_Coordinación_TEMP_PLACEHOLDER'))
-                            <button wire:click="toggleAlertaCoordinacion" class="boton" style="border: 2px solid {{ $alertaCoordinador ? '#FF0000' : '#4CAF50' }}; border-radius: 4px; padding: 4px 10px; font-weight: bold; background-color: {{ $alertaCoordinador ? '#FFdddd' : '#ddFFdd' }}; color: #000; height: auto; min-height: 26px; white-space: normal; margin-bottom: 4px;">
-                                {{ $alertaCoordinador ? '🔕 Desactivar Alerta a Profesores' : '🔔 Enviar Alerta a Profesores' }}
-                            </button>
-                        @endif
-
-                        @if(auth()->user()->hasRole('administrador', 'profesor proyecto'))
-                            <button wire:click="create" class="boton" style="border: 1px solid #999; border-radius: 4px; padding: 4px 15px; font-weight: normal; background-color: #f0f0f0; color: #000; height: auto; min-height: 26px; white-space: nowrap;">
-                                Registrar Nueva Comunidad
-                            </button>
-                        @endif
-                    </td>
-                </tr>
-            </table>
-
-            <table width="100%" border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; border-color: #bbbbbb; font-size: 11px; margin-top: 10px;">
-                <thead>
-                    <tr style="background-color: #8bb2b7; color: #000; font-weight: bold;">
-                        <th width="5%">N°</th>
-                        <th width="30%">Nombre de la Comunidad</th>
-                        <th width="15%">RIF</th>
-                        <th width="30%">Contacto (Correo / Tlf)</th>
-                        <th width="20%">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody class="Texto">
-                    @foreach($comunidades as $index => $c)
-                        <tr style="background-color: {{ $loop->iteration % 2 == 0 ? '#E0E0E0' : '#FFFFFF' }};" valign="top">
-                            <td align="center">{{ $loop->iteration }}</td>
-                            <td align="left">
-                                <span style="font-weight: bold; font-size: 11px;">{{ $c->nombre }}</span><br>
-                                @if($c->anio || $c->coordinacion_id)
-                                    <span style="font-weight: bold; font-size: 9px; color: #8b0000; display:inline-block; margin-bottom:2px;">
-                                        [{{ mb_strtoupper($c->coordinacion->nombre ?? 'N/A') }} - {{ mb_strtoupper($c->anio) }}]
-                                    </span><br>
-                                @endif
-                                @if($c->profesor)
-                                    <span style="font-size: 9px; color: #000; display:inline-block; margin-bottom: 2px;"><b>Prof. Asesor:</b> {{ mb_strtoupper($c->profesor->nombre . ' ' . $c->profesor->apellido) }}</span><br>
-                                @endif
-                                <span style="font-size:9px; color:#555;"><b>Estado:</b> {{ $c->direccion?->municipio?->estado?->nombre ?? 'N/A' }} | <b>Mcpio:</b> {{ $c->direccion?->municipio?->nombre ?? 'N/A' }} <br> {{ $c->direccion?->direccion_exacta ?? 'N/A' }}</span>
-                            </td>
-                            <td align="center">
-                                <span style="font-weight: bold;">{{ $c->rif ?? 'N/A' }}</span><br>
-                                @if($c->activa)
-                                    <span style="color: #008000; font-weight: bold; font-size: 9px;">Activa</span>
-                                @else
-                                    <span style="color: #FF0000; font-weight: bold; font-size: 9px;">Inactiva</span>
-                                @endif
-                            </td>
-                            <td align="center">
-                                {{ $c->correo }} <br>
-                                <span style="font-weight:bold;">{{ $c->numero_telefono }}</span>
-                            </td>
-                            <td align="center">
-                                @if(auth()->user()->hasRole('administrador', 'profesor proyecto'))
-                                    <a href="#" wire:click.prevent="edit({{ $c->id }})" title="Editar" style="color: #0000EE; text-decoration: none; margin-bottom: 2px; display: inline-block;">
-                                        [Editar]
-                                    </a>
-                                    <br>
-                                    <a href="#" wire:click.prevent="toggleStatus({{ $c->id }})" title="Cambiar Estado" style="color: {{ $c->activa ? '#FF0000' : '#008000' }}; text-decoration: none; font-size: 10px;">
-                                        [{{ $c->activa ? 'Inhabilitar' : 'Habilitar' }}]
-                                    </a>
-                                @else
-                                    <span style="color: #888;">[Solo Lectura]</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                    @if($comunidades->isEmpty())
-                        <tr>
-                            <td colspan="5" align="center" style="padding: 20px;">No hay comunidades registradas.</td>
-                        </tr>
+    <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 10px; margin-bottom: 20px;">
+        <legend style="color: #000; font-weight: bold; font-style: italic; padding: 0 5px;">Buscador y listado</legend>
+        <table width="100%" border="0" cellpadding="4" cellspacing="0" style="font-size: 11px;">
+            <tr>
+                <td width="30%"><b>Buscar (nombre / RIF / dirección):</b></td>
+                <td width="50%">
+                    <input wire:model.live="search" type="text" style="width: 90%; padding: 3px;" placeholder="...">
+                </td>
+                <td width="20%" align="right">
+                    @if($puedeGestionar)
+                    <button type="button" wire:click="create" style="padding: 6px 14px; background-color: #8b0000; border: 1px solid #660000; border-radius: 4px; color: white; font-weight: bold; font-size: 0.95rem;">
+                        Registrar nueva comunidad
+                    </button>
                     @endif
-                </tbody>
-            </table>
-            <div style="margin-top: 10px;">{{ $comunidades->links() }}</div>
-        </fieldset>
+                </td>
+            </tr>
+        </table>
 
-    @else
-        <!-- FORMULARIO DE REGISTRO/EDICION -->
-        <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 10px; margin-bottom: 20px;">
-            <legend style="color: #000; font-weight: bold; font-style: italic; padding: 0 5px;">
-                {{ $editingId ? 'Modificar Información de Comunidad' : 'Registrar Nueva Comunidad' }}
-            </legend>
-
-            <!-- Datos Base -->
-            <table width="100%" border="0" cellpadding="6" cellspacing="0" style="font-size: 11px;">
-                <tr>
-                    <td width="20%"><b>Nombre de la Comunidad:</b></td>
-                    <td width="30%">
-                        <input wire:model="nombre" type="text" style="width: 80%;"> <span style="color:red; font-weight:bold;">*</span>
-                        @error('nombre') <br><span style="color:red; font-size:10px;">{{ $message }}</span> @enderror
-                    </td>
-                    <td width="20%"><b>Documento RIF:</b></td>
-                    <td width="30%">
-                        <input wire:model="rif" type="text" style="width: 80%;" placeholder="J-12345678-9"> <span style="color:red; font-weight:bold;">*</span>
-                        @error('rif') <br><span style="color:red; font-size:10px;">{{ $message }}</span> @enderror
-                    </td>
+        <table width="100%" border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; border-color: #bbbbbb; font-size: 11px; margin-top: 10px;">
+            <thead>
+                <tr style="background-color: #8bb2b7; color: #000; font-weight: bold;">
+                    <th width="5%">N°</th>
+                    <th width="35%">Comunidad / dirección</th>
+                    <th width="15%">RIF</th>
+                    <th width="25%">Contacto</th>
+                    <th width="20%">Acciones</th>
                 </tr>
-                <tr>
-                    <td width="20%"><b>Correo Electrónico:</b></td>
-                    <td width="30%">
-                        <input wire:model="correo" type="email" style="width: 80%;"> <span style="color:red; font-weight:bold;">*</span>
-                        @error('correo') <br><span style="color:red; font-size:10px;">{{ $message }}</span> @enderror
+            </thead>
+            <tbody class="Texto">
+                @foreach($comunidades as $c)
+                <tr style="background-color: {{ $loop->iteration % 2 == 0 ? '#E0E0E0' : '#FFFFFF' }};" valign="top">
+                    <td align="center">{{ $loop->iteration }}</td>
+                    <td>
+                        <span style="font-weight: bold;">{{ $c->nombre }}</span>
+                        @if($c->anio)
+                        <br><span style="font-size: 9px; color: #8b0000;">[{{ $c->anio }}]</span>
+                        @endif
+                        <br><span style="font-size: 9px; color: #555;">{{ $c->direccion }}</span>
                     </td>
-                    <td width="20%"><b>Número Teléfono:</b></td>
-                    <td width="30%">
-                        <input wire:model="numero_telefono" type="text" style="width: 80%;"> <span style="color:red; font-weight:bold;">*</span>
-                        @error('numero_telefono') <br><span style="color:red; font-size:10px;">{{ $message }}</span> @enderror
-                    </td>
-                </tr>
-                <tr>
-                    <td width="20%"><b>Fecha de Registro:</b></td>
-                    <td width="30%">
-                        <input wire:model="fecha_registro" type="date" style="width: 80%;">
-                    </td>
-                <tr>
-                    <td width="20%"><b>Estado:</b></td>
-                    <td width="30%">
-                        <select wire:model.live="estado_id" style="width: 80%;">
-                            <option value="">Seleccione Estado...</option>
-                            @foreach($estados as $est)
-                                <option value="{{ $est->id }}">{{ $est->nombre }}</option>
-                            @endforeach
-                        </select> <span style="color:red; font-weight:bold;">*</span>
-                        @error('estado_id') <br><span style="color:red; font-size:10px;">{{ $message }}</span> @enderror
-                    </td>
-                    <td width="20%"><b>Municipio:</b></td>
-                    <td width="30%">
-                        <select wire:model="municipio_id" style="width: 80%;">
-                            <option value="">Seleccione Municipio...</option>
-                            @foreach($municipios as $mun)
-                                <option value="{{ $mun->id }}">{{ $mun->nombre }}</option>
-                            @endforeach
-                        </select> <span style="color:red; font-weight:bold;">*</span>
-                        @error('municipio_id') <br><span style="color:red; font-size:10px;">{{ $message }}</span> @enderror
-                    </td>
-                </tr>
-                <tr>
-                    <td width="20%" valign="top"><b>Dirección Completa:</b></td>
-                    <td colspan="3">
-                        <textarea wire:model="direccion_exacta" style="width: 90%; height:40px;"></textarea>
-                        @error('direccion_exacta') <br><span style="color:red; font-size:10px;">{{ $message }}</span> @enderror
-                    </td>
-                </tr>
-            </table>
-
-            <br>
-            <fieldset style="border: 1px solid #CCC; padding: 10px; margin-bottom: 15px;">
-                <legend style="font-weight: bold; font-size: 12px; padding: 0 5px; background-color: #f0f0f0;">Representantes / Personas de Contacto</legend>
-                
-                <table width="100%" border="0" cellpadding="4" cellspacing="0" style="font-size: 11px; margin-bottom: 10px; background-color: #e9ecef; border: 1px solid #CCC; padding: 5px;">
-                    <tr>
-                        <td width="25%"><b>Nombre:</b><br>
-                            <input wire:model="nuevo_contacto_nombre" type="text" style="width: 90%;">
-                            @error('nuevo_contacto_nombre') <br><span style="color:red; font-size:10px;">{{ $message }}</span> @enderror
-                        </td>
-                        <td width="25%"><b>Cargo/Rol:</b><br>
-                            <select wire:model="nuevo_contacto_role_id" style="width: 90%;">
-                                <option value="">Seleccione...</option>
-                                @foreach($roles_sistema as $r)
-                                    <option value="{{ $r->id }}">{{ ucfirst($r->tipo_de_rol) }}</option>
-                                @endforeach
-                            </select>
-                            @error('nuevo_contacto_role_id') <br><span style="color:red; font-size:10px;">{{ $message }}</span> @enderror
-                        </td>
-                        <td width="20%"><b>Teléfono:</b><br>
-                            <input wire:model="nuevo_contacto_telefono" type="text" style="width: 90%;">
-                        </td>
-                        <td width="30%" rowspan="2" valign="bottom" align="center">
-                            <button wire:click.prevent="addContacto" class="boton" style="border: 1px solid #000; border-radius: 4px; padding: 4px 15px; font-weight: bold; background-color: #8bb2b7; color: #000; height: 35px;">
-                                + Añadir a la Lista
-                            </button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="3">
-                            <div x-data="{ correo: @entangle('nuevo_contacto_correo'), confirmacion: '' }" @contacto-added.window="confirmacion = ''">
-                                <table width="100%" border="0" cellpadding="0" cellspacing="0">
-                                    <tr>
-                                        <td width="50%"><b>Correo Electrónico:</b><br><input type="email" x-model="correo" style="width: 90%;"></td>
-                                        <td width="50%"><b>Confirmar Correo:</b> <span x-show="confirmacion !== '' && correo === confirmacion" style="color:green; font-weight:bold;">(✓ Coinciden)</span>
-                                            <span x-show="confirmacion !== '' && correo !== confirmacion" style="color:red; font-weight:bold;">(X No coinciden)</span>
-                                            <br><input type="email" x-model="confirmacion" style="width: 90%;">
-                                        </td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </td>
-                    </tr>
-                </table>
-
-                <table width="100%" border="1" cellpadding="3" cellspacing="0" style="border-collapse: collapse; border-color: #bbbbbb; margin-top: 10px; font-size: 11px;">
-                    <tr style="background-color: #8bb2b7; color: #000; font-weight: bold; text-align: center;">
-                        <td width="30%">Nombre</td>
-                        <td width="20%">Cargo</td>
-                        <td width="20%">Teléfono</td>
-                        <td width="20%">Correo</td>
-                        <td width="10%">Acción</td>
-                    </tr>
-                    @foreach($contactos as $index => $cont)
-                        <tr style="background-color: {{ $loop->iteration % 2 == 0 ? '#E0E0E0' : '#FFFFFF' }};">
-                            <td align="left" style="padding-left:10px;">{{ mb_strtoupper($cont['nombre']) }}</td>
-                            <td align="center"><span style="font-weight: bold;">{{ mb_strtoupper($cont['cargo_nombre']) }}</span></td>
-                            <td align="center">{{ $cont['telefono'] ?? 'N/A' }}</td>
-                            <td align="center">{{ $cont['correo'] ?? 'N/A' }}</td>
-                            <td align="center">
-                                <a href="#" wire:click.prevent="removeContacto({{ $index }})" style="color: #FF0000; text-decoration: none;">[Quitar]</a>
-                            </td>
-                        </tr>
-                    @endforeach
-                    @if(empty($contactos))
-                        <tr>
-                            <td colspan="5" align="center" style="padding: 10px; background-color: #FFFFFF;">
-                                No hay representantes registrados. Utilice el formulario de arriba para añadirlos.
-                            </td>
-                        </tr>
-                    @endif
-                </table>
-            </fieldset>
-
-            <br>
-            <table width="100%" border="0" cellpadding="4" cellspacing="0">
-                <tr>
+                    <td align="center">{{ $c->rif }}</td>
+                    <td align="center">{{ $c->correo }}<br><b>{{ $c->numero_telefono }}</b></td>
                     <td align="center">
-                        <button wire:click="save" class="boton" style="border: 1px solid #000; border-radius: 4px; padding: 4px 20px; font-weight: bold; background-color: #8bb2b7; color: #000; height: 30px;">
-                            {{ $editingId ? 'Actualizar Información' : 'Registrar Comunidad' }}
+                        @if($puedeGestionar)
+                        <button type="button" wire:click.prevent="edit({{ $c->id }})" class="btn btn-info btn-md" style="display: flex; align-items: center; justify-content: center; gap: 5px;" wire:loading.attr="disabled" wire:target="edit">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-square" viewBox="0 0 16 16" style="margin-right: 5px;">
+                                <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z" />
+                                <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z" />
+                            </svg>
+                            <span>Editar</span>
                         </button>
-                        <button wire:click="cancel" class="boton" style="border: 1px solid #999; border-radius: 4px; padding: 4px 15px; font-weight: normal; background-color: #f0f0f0; color: #000; height: 30px; margin-left: 10px;">
-                            Cancelar
-                        </button>
+                        @else
+                        <span style="color: #888; font-size: 10px;">Solo lectura</span>
+                        @endif
                     </td>
                 </tr>
-            </table>
-        </fieldset>
+                @endforeach
+                @if($comunidades->isEmpty())
+                <tr>
+                    <td colspan="5" align="center" style="padding: 20px;">No hay comunidades registradas.</td>
+                </tr>
+                @endif
+            </tbody>
+        </table>
+        <div style="margin-top: 10px;">{{ $comunidades->links() }}</div>
+    </fieldset>
+    @else
+    <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 10px;">
+        <legend style="font-weight: bold; font-style: italic; padding: 0 5px;">
+            {{ $editingId ? 'Modificar comunidad' : 'Registrar comunidad' }}
+        </legend>
+        <table width="100%" border="0" cellpadding="6" cellspacing="0" style="font-size: 11px;">
+            <tr>
+                <td width="20%"><b>Nombre:</b></td>
+                <td width="30%">
+                    <input wire:model="nombre" type="text" style="width: 90%;"> <span class="obligatorio">*</span>
+                    @error('nombre') <br><span style="color:red;font-size:10px;">{{ $message }}</span> @enderror
+                </td>
+                <td width="20%"><b>RIF:</b></td>
+                <td width="30%">
+                    <input wire:model="rif" type="text" style="width: 90%;">
+                    @error('rif') <br><span style="color:red;font-size:10px;">{{ $message }}</span> @enderror
+                </td>
+            </tr>
+            <tr>
+                <td><b>Correo:</b></td>
+                <td>
+                    <input wire:model="correo" type="email" style="width: 90%;"> <span class="obligatorio">*</span>
+                    @error('correo') <br><span style="color:red;font-size:10px;">{{ $message }}</span> @enderror
+                </td>
+                <td><b>Teléfono:</b></td>
+                <td>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <select wire:model="prefijo_telefono" style="padding: 3px;">
+                            <option value="0424">0424</option>
+                            <option value="0414">0414</option>
+                            <option value="0412">0412</option>
+                            <option value="0422">0422</option>
+                            <option value="0416">0416</option>
+                            <option value="0426">0426</option>
+                        </select>
+                        <input wire:model="numero_telefono" type="text" style="width: 60%;" placeholder="XXX-XXXX"> <span class="obligatorio">*</span>
+                    </div>
+                    @error('prefijo_telefono') <br><span style="color:red;font-size:10px;">{{ $message }}</span> @enderror
+                    @error('numero_telefono') <br><span style="color:red;font-size:10px;">{{ $message }}</span> @enderror
+                </td>
+            </tr>
+            <tr>
+                <td><b>Año / trayecto ref.:</b></td>
+                <td colspan="3">
+                    <input wire:model="anio" type="text" style="width: 40%;" placeholder="Ej. Año IV (opcional)">
+                    @error('anio') <span style="color:red;font-size:10px;">{{ $message }}</span> @enderror
+                </td>
+            </tr>
+            <tr>
+                <td valign="top"><b>Dirección y notas:</b></td>
+                <td colspan="3">
+                    <textarea wire:model="direccion" rows="4" style="width: 95%;" placeholder="Dirección, estado/municipio, autoridades y personal vinculado..."></textarea>
+                    <span class="obligatorio">*</span>
+                    @error('direccion') <br><span style="color:red;font-size:10px;">{{ $message }}</span> @enderror
+                    <div style="font-size: 9px; color: #666; margin-top: 4px;">
+                        Cargos sugeridos (texto libre): {{ implode(' · ', config('comunidades.cargos_contacto', [])) }}
+                    </div>
+                </td>
+            </tr>
+        </table>
+        <div style="margin-top: 15px; text-align: center;">
+            <button type="button" wire:click="cancel" class="btn btn-secondary btn-md" style="margin-right: 10px;">Cancelar</button>
+            <button type="button" wire:click="save" class="btn btn-primary btn-md">Guardar</button>
+        </div>
+    </fieldset>
     @endif
-
-
 </div>

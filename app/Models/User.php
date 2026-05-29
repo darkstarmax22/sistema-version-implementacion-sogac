@@ -170,10 +170,25 @@ class User extends Authenticatable
 
     public function puedeRegistrarProyecto(): bool
     {
-        if ($this->hasRole('administrador')) {
-            return true;
+        return app(\App\Services\ProyectoGestionService::class)->usuarioPuedeRegistrar($this);
+    }
+
+    /**
+     * Configuración local del módulo (trayecto/sección) si el docente está habilitado en intranet.
+     */
+    public function profesorProyectoModulo(): ?object
+    {
+        $service = app(\App\Services\IntranetProfessorService::class);
+        $lapso = $service->lapsosActivos()->first();
+        if (! $lapso) {
+            return null;
         }
 
-        return $this->hasRole('estudiante') && $this->perteneceAEquipo('lider');
+        $cfg = $service->configuracionModulo(trim((string) $this->usu_cedula), (int) $lapso->lap_codigo);
+        if (! $cfg || ! ($cfg['ppm_habilitado'] ?? false)) {
+            return null;
+        }
+
+        return (object) $cfg;
     }
 }

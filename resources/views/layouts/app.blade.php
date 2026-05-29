@@ -170,6 +170,7 @@
         .columna_color_oscuro{ background-color:#C3E0E4; }
         .columna_color_claro{ background-color:#8FC4CB; }
     </style>
+    @stack('styles')
     @livewireStyles
 </head>
 <body>

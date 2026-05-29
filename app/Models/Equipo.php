@@ -4,6 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+/**
+ * @deprecated El equipo del módulo es encapsulación intranet (EQSEC / grupo_proyecto).
+ *             No usar tabla local equipos; ver GrupoProyectoService.
+ */
 class Equipo extends RepositorioModel
 {
     use HasFactory;

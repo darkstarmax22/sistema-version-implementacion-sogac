@@ -3,17 +3,16 @@
 namespace App\Providers;
 
 use App\Services\UserRoleService;
+use App\Support\NavigationMenu;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         $this->app->singleton(UserRoleService::class);
+        $this->app->singleton(NavigationMenu::class);
     }
 
     public function boot(): void

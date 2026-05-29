@@ -2,20 +2,22 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Concerns\HasCatalogLogic;
 
 class Comunidad extends RepositorioModel
 {
-    use HasFactory;
+    use HasCatalogLogic;
 
     protected $table = 'comunidades';
+
+    protected $primaryKey = 'com_codigo';
 
     protected $fillable = [
         'nombre',
         'rif',
         'correo',
         'numero_telefono',
+        'direccion',
         'anio',
     ];
-
 }

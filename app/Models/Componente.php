@@ -2,23 +2,58 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\HasCatalogLogic;
 
-class Componente extends Model
+class Componente extends RepositorioModel
 {
-    use HasFactory;
+    use HasCatalogLogic;
+
+    protected $table = 'componentes';
 
     protected $fillable = [
         'nombre',
         'coordinacion_id',
         'anio',
         'es_obligatorio',
-        'estado_logico'
+        'estado_logico',
     ];
 
-    public function coordinacion()
+    protected $casts = [
+        'es_obligatorio' => 'boolean',
+        'estado_logico' => 'boolean',
+    ];
+
+    /**
+     * Guarda múltiples componentes.
+     */
+    public static function guardarMuchos(array $rows, string $coordinacion_id, string $anio): void
     {
-        return $this->belongsTo(Coordinacion::class);
+        foreach ($rows as $row) {
+            self::create([
+                'nombre' => $row['nombre'],
+                'coordinacion_id' => $coordinacion_id,
+                'anio' => $anio,
+                'es_obligatorio' => $row['es_obligatorio'],
+                'estado_logico' => true,
+            ]);
+        }
+    }
+
+    public function getNombreCoordinacionAttribute(): string
+    {
+        $id = $this->coordinacion_id;
+        if (! $id) {
+            return 'N/A';
+        }
+
+        return once(function () use ($id) {
+            $conn = \App\Helpers\DualDatabase::academicConnection();
+            $prog = \Illuminate\Support\Facades\DB::connection($conn)
+                ->table('programa')
+                ->where('pro_codigo', $id)
+                ->first(['pro_nombre', 'pro_siglas']);
+
+            return $prog ? ($prog->pro_siglas ?? $prog->pro_nombre) : "Programa #{$id}";
+        });
     }
 }

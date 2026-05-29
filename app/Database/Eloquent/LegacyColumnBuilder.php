@@ -40,4 +40,14 @@ class LegacyColumnBuilder extends Builder
 
         return parent::orderBy($column, $direction);
     }
+
+    public function orderByDesc($column)
+    {
+        return $this->orderBy($column, 'desc');
+    }
+
+    public function orderByAsc($column)
+    {
+        return $this->orderBy($column, 'asc');
+    }
 }

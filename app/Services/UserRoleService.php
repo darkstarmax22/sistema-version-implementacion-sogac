@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\DbHelper;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
@@ -79,12 +80,17 @@ class UserRoleService
             $roles['estudiante'] = $this->label('estudiante');
         }
 
-        if (DB::connection($conn)->table('seccion_unidad_docente')->whereRaw('TRIM(sud_ced_docente) = ?', [$cedula])->exists()) {
+        if (app(IntranetProfessorService::class)->esProfesorProyectoVigente($cedula)) {
             $roles['profesor proyecto'] = $this->label('profesor proyecto');
         }
 
         $this->cachedAvailableRoles = $roles;
         $this->cachedCedula = $cedula;
+
+        $mirror = app(IntranetSimulationMirrorService::class);
+        if ($mirror->shouldMirrorFromIntranet()) {
+            $mirror->mirrorUserContext($cedula);
+        }
 
         return $roles;
     }
@@ -124,6 +130,13 @@ class UserRoleService
             Session::put($this->sessionKey(), $role);
             $this->clearCache();
 
+            // Exportar contexto y rol al seleccionar
+            $mirror = app(IntranetSimulationMirrorService::class);
+            if ($mirror->shouldMirrorFromIntranet()) {
+                $mirror->mirrorUserContext($user->usu_cedula);
+                $mirror->updateSimulationUserRole($user->usu_cedula, $role);
+            }
+
             return true;
         }
 
@@ -134,6 +147,13 @@ class UserRoleService
 
         Session::put($this->sessionKey(), $role);
         $this->clearCache();
+
+        // Exportar contexto y rol al seleccionar
+        $mirror = app(IntranetSimulationMirrorService::class);
+        if ($mirror->shouldMirrorFromIntranet()) {
+            $mirror->mirrorUserContext($user->usu_cedula);
+            $mirror->updateSimulationUserRole($user->usu_cedula, $role);
+        }
 
         return true;
     }
@@ -150,44 +170,46 @@ class UserRoleService
             return;
         }
 
-        if ($this->allowsFreeSessionRoles()) {
-            return;
-        }
-
         $available = $this->detectAvailableRoles($user);
-        if ($available === [] || count($available) !== 1) {
+
+        if ($available === []) {
+            return; // No hay roles detectados, no se asigna ninguno
+        }
+
+        // Priorizar 'administrador' si está disponible entre los roles reales
+        if (array_key_exists('administrador', $available)) {
+            Session::put($this->sessionKey(), 'administrador');
             return;
         }
 
+        // Si no es administrador, asignar el primer rol detectado
         Session::put($this->sessionKey(), array_key_first($available));
     }
 
     public function userHasRole(User $user, string ...$requestedRoles): bool
     {
-        $active = $this->getActiveRole($user);
+        $activeSessionRole = $this->getActiveRole($user);
 
-        if ($active !== null) {
+        if ($activeSessionRole !== null) {
+            // Si hay un rol de sesión activo (simulado o real y válido)
             foreach ($requestedRoles as $requested) {
-                if ($this->roleMatches($requested, $active)) {
+                if ($this->roleMatches($requested, $activeSessionRole)) {
                     return true;
                 }
             }
-
-            return false;
+            return false; // El rol de sesión activo no coincide con ninguno de los roles solicitados
         }
 
-        if ($this->allowsFreeSessionRoles()) {
-            return false;
-        }
+        // Si no se establece ningún rol de sesión activo (significa que no hay un rol simulado, o el simulado era inválido/borrado)
+        // En este caso, verificamos los roles reales detectados del usuario desde la base de datos/intranet.
+        $availableDetectedRoles = array_keys($this->detectAvailableRoles($user));
 
-        $available = array_keys($this->detectAvailableRoles($user));
-
-        if (in_array('administrador', $available, true)) {
-            return true;
+        if (in_array('administrador', $availableDetectedRoles, true)) {
+            return true; // Un administrador real siempre tiene todos los permisos en este contexto
         }
 
         foreach ($requestedRoles as $requested) {
-            foreach ($available as $owned) {
+            foreach ($availableDetectedRoles as $owned) {
                 if ($this->roleMatches($requested, $owned)) {
                     return true;
                 }
@@ -233,6 +255,7 @@ class UserRoleService
     public function moduleRoleButtons(User $user): array
     {
         $active = $this->getActiveRole($user);
+        $detectados = $this->detectAvailableRoles($user);
         $buttons = [];
 
         foreach (config('roles.module_buttons', []) as $key => $meta) {
@@ -241,12 +264,52 @@ class UserRoleService
                 'key' => $key,
                 'label' => $meta['label'],
                 'slug' => $slug,
-                'enabled' => true,
+                'enabled' => $this->allowsFreeSessionRoles()
+                    || array_key_exists($slug, $detectados),
                 'active' => $active === $slug,
             ];
         }
 
         return $buttons;
+    }
+
+    public function puedeAsumirRolEnSesion(User $user, string $role): bool
+    {
+        $role = strtolower(trim($role));
+        $detectados = array_keys($this->detectAvailableRoles($user));
+
+        return in_array($role, $detectados, true);
+    }
+
+    /**
+     * Revalida que el rol activo en sesión sigue siendo válido (intranet / lapso / UC proyecto).
+     */
+    public function rolActivoSigueSiendoValido(User $user): bool
+    {
+        // Si la intranet está caída, confiamos en lo que ya está en simulación o sesión
+        if (! DbHelper::isUsingIntranet()) {
+            return true;
+        }
+
+        if ($this->allowsFreeSessionRoles()) {
+            return true;
+        }
+
+        $active = $this->getActiveRole($user);
+        if ($active === null) {
+            return true;
+        }
+
+        if (! $this->puedeAsumirRolEnSesion($user, $active)) {
+            return false;
+        }
+
+        if ($active === 'profesor proyecto') {
+            return app(IntranetProfessorService::class)
+                ->esProfesorProyectoVigente(trim((string) $user->usu_cedula));
+        }
+
+        return true;
     }
 
     public function setActiveRoleByModuleKey(User $user, string $moduleKey): bool

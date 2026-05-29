@@ -32,7 +32,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'aliases' => [
-        'coordinador' => ['coordinador', 'coordinador coordinacion', 'COORDINADOR_Coordinación_TEMP_PLACEHOLDER', 'coordinacion'],
+        'coordinador' => ['coordinador', 'coordinacion', 'coordinador coordinacion'],
         'profesor proyecto' => ['profesor proyecto', 'profesor', 'docente'],
         'administrador' => ['administrador', 'admin'],
     ],

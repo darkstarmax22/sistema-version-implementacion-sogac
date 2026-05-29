@@ -3,7 +3,9 @@
 namespace App\Support;
 
 use App\Models\User;
+use App\Services\IntranetEquipoSeccionService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Consulta si un estudiante pertenece a un equipo de proyecto (intranet / simulación).
@@ -53,15 +55,24 @@ class UserEquiposQuery
         }
 
         try {
-            $query = DB::connection($this->connection)
-                ->table('grupo_proyecto_estudiante')
-                ->where(DB::raw('TRIM(gpe_ced_estudiante)'), $this->cedula);
+            if (Schema::connection($this->connection)->hasTable('grupo_proyecto_estudiante')) {
+                $query = DB::connection($this->connection)
+                    ->table('grupo_proyecto_estudiante')
+                    ->where(DB::raw('TRIM(gpe_ced_estudiante)'), $this->cedula);
 
-            if ($this->rolProyectoId !== null) {
-                $query->where('gpe_rol_id', $this->rolProyectoId);
+                if ($this->rolProyectoId !== null) {
+                    $query->where('gpe_rol_id', $this->rolProyectoId);
+                }
+
+                return User::rememberEquiposExists($cacheKey, $query->exists());
             }
 
-            return User::rememberEquiposExists($cacheKey, $query->exists());
+            $service = app(IntranetEquipoSeccionService::class);
+            if ($this->rolProyectoId === self::ROL_LIDER) {
+                return User::rememberEquiposExists($cacheKey, $service->estudiantePuedeRegistrar($this->cedula));
+            }
+
+            return User::rememberEquiposExists($cacheKey, $service->equiposDelEstudiante($this->cedula)->isNotEmpty());
         } catch (\Throwable) {
             return User::rememberEquiposExists($cacheKey, false);
         }

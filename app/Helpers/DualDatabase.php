@@ -2,6 +2,7 @@
 
 namespace App\Helpers;
 
+use App\Services\IntranetSimulationMirrorService;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -39,23 +40,35 @@ class DualDatabase
     }
 
     /**
-     * Doble consulta académica: intranet (o simulación) y, si no hay tabla/datos, repositorio local.
+     * Lectura académica: solo intranet o simulación (sin copiar a repositorio).
+     *
+     * @deprecated Use tablaAcademicaSoloLectura() o ConexionDualService::consultaAcademica()
      */
     public static function table(string $table): Builder
     {
-        $localTable = config("dual_database.local_aliases.{$table}", $table);
+        if (self::isIntranetTable($table)) {
+            return self::tablaAcademicaSoloLectura($table);
+        }
+
+        return self::repositorioTable($table);
+    }
+
+    /**
+     * SELECT sobre intranet/simulación. No insertar ni actualizar aquí.
+     */
+    public static function tablaAcademicaSoloLectura(string $table): Builder
+    {
+        if (! self::isIntranetTable($table)) {
+            throw new RuntimeException("[{$table}] no está catalogada como tabla académica (solo lectura).");
+        }
+
         $academic = self::academicConnection();
 
-        if (self::hasTable($academic, $table)) {
-            return DB::connection($academic)->table($table);
+        if (! self::hasTable($academic, $table)) {
+            throw new RuntimeException("La tabla académica [{$table}] no existe en {$academic}.");
         }
 
-        $repo = self::repositorioConnection();
-        if (self::hasTable($repo, $localTable)) {
-            return DB::connection($repo)->table($localTable);
-        }
-
-        throw new RuntimeException("La tabla académica [{$table}] no existe en intranet/simulación ni en repositorio.");
+        return DB::connection($academic)->table($table);
     }
 
     /**
@@ -82,7 +95,10 @@ class DualDatabase
             $query->orderBy($orderBy);
         }
 
-        return $query->get()->all();
+        $rows = $query->get()->all();
+        self::mirrorAcademicRows($table, $rows);
+
+        return $rows;
     }
 
     /**
@@ -90,6 +106,23 @@ class DualDatabase
      */
     public static function firstWhere(string $table, string $column, mixed $value): ?object
     {
-        return self::table($table)->where($column, $value)->first();
+        $row = self::table($table)->where($column, $value)->first();
+        if ($row !== null) {
+            self::mirrorAcademicRows($table, [$row]);
+        }
+
+        return $row;
+    }
+
+    /**
+     * @param  iterable<int, object|array<string, mixed>>  $rows
+     */
+    public static function mirrorAcademicRows(string $table, iterable $rows): void
+    {
+        if (! self::isIntranetTable($table)) {
+            return;
+        }
+
+        app(IntranetSimulationMirrorService::class)->mirrorRows($table, $rows);
     }
 }

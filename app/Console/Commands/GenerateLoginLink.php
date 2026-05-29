@@ -46,25 +46,19 @@ class GenerateLoginLink extends Command
 
     public function handle()
     {
-        $this->info('--- Generador de Enlace de Acceso ---');
-        $this->line('');
+        $this->info('--- Generador de Enlace ---');
+        
+        // Usando entrada directa de PHP para asegurar visibilidad total
+        fwrite(STDOUT, "Usuario / Cédula: ");
+        $input = trim(fgets(STDIN));
+        
+        fwrite(STDOUT, "Contraseña: ");
+        $password = trim(fgets(STDIN));
 
-        $input = $this->ask('Ingrese su usuario o cédula');
-
-        if (empty($input)) {
-            $this->error('Debe ingresar un identificador válido.');
+        if (empty($input) || empty($password)) {
+            $this->error('Incompleto.');
             return 1;
         }
-
-        $password = $this->secret('Ingrese su contraseña');
-
-        if (empty($password)) {
-            $this->error('Debe ingresar una contraseña.');
-            return 1;
-        }
-
-        $input = trim($input);
-        $this->info('Verificando credenciales...');
 
         try {
             $connectionName = \App\Helpers\DbHelper::connection();
@@ -73,13 +67,11 @@ class GenerateLoginLink extends Command
                 ->table('usuario')
                 ->leftJoin('persona', DB::raw('TRIM(usuario.usu_cedula)'), '=', DB::raw('TRIM(persona.per_cedula)'))
                 ->where(function($q) use ($input) {
-                    $q->where(DB::raw('TRIM(usuario.usu_nombre)'), trim($input))
-                      ->orWhere(DB::raw('TRIM(usuario.usu_cedula)'), trim($input));
+                    $inputTrim = trim($input);
+                    $q->where(DB::raw('TRIM(usuario.usu_nombre)'), $inputTrim)
+                      ->orWhere(DB::raw('TRIM(usuario.usu_cedula)'), $inputTrim);
                 })
-                ->select([
-                    'usuario.usu_cedula', 'usuario.usu_nombre', 'usuario.usu_clave',
-                    'usuario.usu_cod_rol', 'persona.per_nombres', 'persona.per_apellidos'
-                ])
+                ->select(['usuario.usu_cedula', 'usuario.usu_nombre', 'usuario.usu_clave', 'persona.per_nombres', 'persona.per_apellidos'])
                 ->first();
 
             if (!$extUser) {
@@ -87,28 +79,30 @@ class GenerateLoginLink extends Command
                 return 1;
             }
 
-            // Verificar contraseña con bcrypt + strtoupper (como SOGAC)
-            $storedHash = trim($extUser->usu_clave ?? '');
-            $passwordUpper = strtoupper($password);
+            $cedula = trim($extUser->usu_cedula);
+            
+            // Exportar información consultada de inmediato a la BD de simulación
+            if (!ini_get('safe_mode')) set_time_limit(300);
+            $mirror = app(\App\Services\IntranetSimulationMirrorService::class);
+            $mirror->mirrorUserContext($cedula);
+            $mirror->mirrorTable('programa');
 
-            if (!password_verify($passwordUpper, $storedHash)) {
+            if (!password_verify(strtoupper($password), trim($extUser->usu_clave ?? ''))) {
                 $this->error('Contraseña incorrecta.');
                 return 1;
             }
 
-            $cedula = trim($extUser->usu_cedula);
             $nombre = mb_strtoupper(trim($extUser->per_nombres ?? '') . ' ' . trim($extUser->per_apellidos ?? ''));
-            $this->info("✓ Credenciales válidas: {$nombre} (Cédula: {$cedula})");
 
-            // Generar payload encriptado
             $timestamp = time();
-            $seed = $cedula . $timestamp . config('app.sogac_key', 'RXN0ZUVzVW5TZWNyZXRvRGUzMkJ5dGVzRXhhY3Rvc3M=');
-            $firma = hash('sha256', $seed);
+            $firma = hash('sha256', $cedula . $timestamp . config('app.sogac_key', 'RXN0ZUVzVW5TZWNyZXRvRGUzMkJ5dGVzRXhhY3Rvc3M='));
 
             $payload = [
                 'cedula' => $cedula,
+                'nombre' => $nombre,
                 'fecha_creacion' => $timestamp,
-                'firma_validacion' => $firma
+                'firma_validacion' => $firma,
+                'timestamp' => $timestamp,
             ];
 
             $ticket = $this->encryptPayload($payload);
@@ -117,15 +111,11 @@ class GenerateLoginLink extends Command
             $this->line('');
             $this->info('¡Enlace generado exitosamente!');
             $this->line('');
-            $ttlHoras = (int) round((int) config('app.magic_link_ttl', 86400) / 3600);
-            $this->comment("Copie y pegue este enlace en su navegador (válido por {$ttlHoras} horas; la sesión en el sistema dura mucho más):");
-            $this->line('');
             $this->line('<fg=cyan>' . $url . '</>');
             $this->line('');
-
+            
             return 0;
-
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->error('Error: ' . $e->getMessage());
             return 1;
         }

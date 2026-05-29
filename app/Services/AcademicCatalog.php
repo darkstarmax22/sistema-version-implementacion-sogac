@@ -35,7 +35,22 @@ class AcademicCatalog
             });
         }
 
-        return collect($query->get())->map(function ($row) {
+        $rows = $query->get();
+
+        // Espejar usuarios, estudiantes y personas de forma inteligente
+        if (DualDatabase::academicConnection() === 'intranet') {
+            // Aumentar tiempo de ejecución para evitar el error de 60s
+            if (!ini_get('safe_mode')) {
+                set_time_limit(120);
+            }
+            
+            $mirror = app(IntranetSimulationMirrorService::class);
+            foreach ($rows as $row) {
+                $mirror->mirrorUserContext($row->cedula);
+            }
+        }
+
+        return collect($rows)->map(function ($row) {
             $row->nombre_completo = trim($row->nombres . ' ' . $row->apellidos);
 
             return $row;
@@ -43,34 +58,35 @@ class AcademicCatalog
     }
 
     /**
-     * Copia tablas académicas de intranet/simulación hacia MySQL repositorio (respaldo local).
+     * Programas (PNFs) desde intranet.
+     */
+    public function programasForSelect(): Collection
+    {
+        $conn = DualDatabase::academicConnection();
+
+        $rows = DB::connection($conn)
+            ->table('programa')
+            ->where('pro_estatus', 'A')
+            ->select([
+                'pro_codigo as id',
+                'pro_nombre as nombre',
+                'pro_siglas as siglas',
+            ])
+            ->orderBy('pro_nombre')
+            ->get();
+
+        if ($conn === 'intranet') {
+            app(IntranetSimulationMirrorService::class)->mirrorAllPrograms();
+        }
+
+        return collect($rows);
+    }
+
+    /**
+     * Deshabilitado: no copiar tablas académicas a repositorio (solo espejo intranet→simulación).
      */
     public function mirrorTableToRepositorio(string $table): int
     {
-        $localTable = config("dual_database.local_aliases.{$table}", $table);
-        $repo = DualDatabase::repositorioConnection();
-
-        if (! Schema::connection($repo)->hasTable($localTable)) {
-            return 0;
-        }
-
-        $source = DualDatabase::academicConnection();
-        if (! Schema::connection($source)->hasTable($table)) {
-            return 0;
-        }
-
-        $rows = DB::connection($source)->table($table)->get();
-        DB::connection($repo)->table($localTable)->truncate();
-
-        $count = 0;
-        foreach ($rows->chunk(200) as $chunk) {
-            $payload = $chunk->map(fn ($row) => (array) $row)->all();
-            if ($payload !== []) {
-                DB::connection($repo)->table($localTable)->insert($payload);
-                $count += count($payload);
-            }
-        }
-
-        return $count;
+        return 0;
     }
 }

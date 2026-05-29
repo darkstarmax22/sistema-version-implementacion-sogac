@@ -9,18 +9,14 @@ class SyncAcademicMirrorsToRepositorio extends Command
 {
     protected $signature = 'app:sync-academic-mirrors';
 
-    protected $description = 'Copia tablas académicas de intranet a MySQL repositorio (doble lectura local).';
+    protected $description = 'Obsoleto: no se copian tablas académicas a repositorio. Use espejo intranet→simulación.';
 
     public function handle(AcademicCatalog $catalog): int
     {
-        $tables = config('dual_database.repositorio_mirror_tables', []);
-
-        foreach ($tables as $table) {
-            $count = $catalog->mirrorTableToRepositorio($table);
-            $this->line("  {$table}: {$count} filas");
-        }
-
-        $this->info('Espejo académico en repositorio actualizado.');
+        $this->warn('Este comando ya no escribe en repositorio.');
+        $this->line('Lectura académica: intranet (o simulación si cae).');
+        $this->line('Escritura del módulo: solo MySQL repositorio.');
+        $this->line('Respaldo: php artisan app:mirror-intranet-user {cedula} (intranet → simulación).');
 
         return 0;
     }

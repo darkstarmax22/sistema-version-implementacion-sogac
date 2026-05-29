@@ -15,20 +15,16 @@ new class extends Component
 
     public function with()
     {
-        $query = Proyecto::with(['tipo_publicacion', 'linea_investigacion', 'comunidad'])
-            ->aprobados()
-            ->where('estado_logico', true);
-
-        if ($this->search) {
-            $query->where(function($q) {
-                $q->where('titulo', 'like', '%' . $this->search . '%')
-                  ->orWhere('resumen', 'like', '%' . $this->search . '%');
-            });
-        }
-
         return [
-            'proyectos' => $query->latest()->paginate(9),
-            'coordinaciones' => Coordinacion::all(),
+            'proyectos' => Proyecto::busquedaPublica(
+                $this->search,
+                (int) $this->filterCoordinacion ?: null,
+                $this->filterLapso
+            )->latest()->paginate(9),
+            'coordinaciones' => app(\App\Services\ModuloRepositorioService::class)
+                ->queryModel(\App\Models\Coordinacion::class)
+                ->orderBy('nombre')
+                ->get(),
         ];
     }
 };
