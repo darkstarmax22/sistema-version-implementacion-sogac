@@ -183,7 +183,7 @@
                             <td><b>{{ $g->nombre }}</b></td>
                             <td>
                                 <b>{{ $g->pro_siglas ?: ($g->pro_nombre ?: 'PNF') }}</b>
-                                &middot; {{ $g->sec_nombre ?: 'Secci&oacute;n ' . $g->sec_codigo }}
+                                &middot; {{ $g->sec_nombre ?: 'Sección ' . $g->sec_codigo }}
                                 @if (!empty($g->lap_nombre))
                                     <span style="color:#666;font-size:9px;">({{ $g->lap_nombre }})</span>
                                 @endif
@@ -210,7 +210,7 @@
         </fieldset>
     @else
         <fieldset style="border: 2px solid #8b0000; padding: 10px;">
-            <legend style="font-weight: bold;">{{ $editingGrpCodigo ? 'Editar grupo' : 'Nuevo grupo de proyecto' }}
+            <legend style="font-weight: bold;">{{ $editingGrpCodigo ? 'Editar grupo' : 'Registrar grupo de proyecto' }}
             </legend>
             <table width="100%" style="font-size: 11px;">
                 <tr>

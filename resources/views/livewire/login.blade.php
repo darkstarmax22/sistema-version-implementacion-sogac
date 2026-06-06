@@ -5,7 +5,7 @@
 
     <div id="centro_login">
         <h2 style="font-size: 22px; font-weight: bold; margin-top: 30px; margin-bottom: 30px;">
-            Inicie Sesi&oacute;n en el Software para la Gesti&oacute;n Acad&eacute;mica
+            Iniciar Sesi&oacute;n &mdash; Repositorio UPTP
         </h2>
 
         <form wire:submit="login">

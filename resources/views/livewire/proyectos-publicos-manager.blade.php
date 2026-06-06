@@ -52,7 +52,7 @@
                             <div style="font-size: 10px; color: #888; margin-bottom: 3px;">
                                 {{ $c->fecha_creacion ? $c->fecha_creacion->format('d/m/Y h:i A') : '' }}
                                 &middot;
-                                {{ $c->nombre_contacto ?? ($c->usuarioExterno?->nombre ?? 'An&oacute;nimo') }}
+                                {{ $c->nombre_contacto ?? ($c->usuarioExterno?->nombre ?? 'Anónimo') }}
                             </div>
                             <div style="font-size: 13px;">{{ $c->descripcion }}</div>
                         </div>

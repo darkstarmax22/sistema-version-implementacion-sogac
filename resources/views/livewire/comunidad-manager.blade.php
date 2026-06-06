@@ -77,7 +77,7 @@
                 <tr>
                     <td width="65%">
                         <b>Buscar (nombre / RIF):</b>
-                        <input wire:model.live="search" type="text" style="width: 90%; padding: 3px;" placeholder="...">
+                        <input wire:model.live="search" type="text" style="width: 90%; padding: 3px;" placeholder="Nombre o RIF...">
                     </td>
                     <td width="35%" align="right">
                         @if ($puedeGestionar)

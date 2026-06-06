@@ -81,7 +81,7 @@
             @if($mostrarFormDep)
                 <fieldset style="border: 1px solid #ccc; border-radius: 4px; padding: 10px; margin-bottom: 15px;">
                     <legend style="font-weight: bold; font-size:12px; padding: 0 5px;">
-                        {{ $editandoDepId ? 'Editar Departamento' : 'Nuevo Departamento' }}
+                        {{ $editandoDepId ? 'Editar Departamento' : 'Registrar Departamento' }}
                     </legend>
                     <table width="100%" border="0" cellpadding="5" cellspacing="0" style="font-size: 11px;">
                         <tr>
@@ -165,7 +165,7 @@
              ═══════════════════════════════════════════════════ --}}
         <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 10px;">
             <legend style="color: #000; font-weight: bold; font-style: italic; padding: 0 5px;">
-                {{ $org_nombre_key ? 'Editar Organizaci&oacute;n' : 'Nueva Organizaci&oacute;n' }}
+                {{ $org_nombre_key ? 'Editar Organización' : 'Registrar Organización' }}
             </legend>
             <table width="100%" border="0" cellpadding="5" cellspacing="0" style="font-size: 11px;">
                 <tr>

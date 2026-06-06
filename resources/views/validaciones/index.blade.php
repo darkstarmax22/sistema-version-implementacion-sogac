@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Validación de Proyectos')
-@section('header', 'Módulo de Revisión')
+@section('header', 'Validación de Proyectos')
 
 @section('content')
     <livewire:validaciones-manager />

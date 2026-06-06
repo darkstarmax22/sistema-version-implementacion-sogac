@@ -5,15 +5,15 @@
     </p>
 
     <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 10px; margin-bottom: 15px;">
-        <legend style="color: #000; font-weight: bold; font-style: italic; padding: 0 5px;">Busqueda en el Repositorio</legend>
+        <legend style="color: #000; font-weight: bold; font-style: italic; padding: 0 5px;">Búsqueda en el Repositorio</legend>
         <table width="100%" border="0" cellpadding="8" cellspacing="0" style="font-size: 11px;">
             <tr>
                 <td width="50%">
                     <b>B&uacute;squeda global (T&iacute;tulo, resumen):</b><br>
-                    <input wire:model.live="search" type="text" style="width: 95%;" placeholder="...">
+                    <input wire:model.live="search" type="text" style="width: 95%;" placeholder="Título o palabra clave...">
                 </td>
                 <td width="25%">
-                    <b>Filtrar por Coordinaci&oacute;n:</b><br>
+                    <b>Filtrar por Programa:</b><br>
                     <select wire:model.live="filterPrograma" style="width: 95%;">
                         <option value="">Todos los programas</option>
                         @foreach($programas as $p) <option value="{{ $p->id }}">{{ $p->siglas }} - {{ $p->nombre }}</option> @endforeach

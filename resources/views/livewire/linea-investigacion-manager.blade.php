@@ -67,7 +67,7 @@
         <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
             <div>
                 <b>Buscar Línea:</b>
-                <input wire:model.live.debounce.300ms="search" type="text" style="width: 400px; padding: 4px 6px; border-radius: 4px; border: 1px solid #999;" placeholder="...">
+                <input wire:model.live.debounce.300ms="search" type="text" style="width: 400px; padding: 4px 6px; border-radius: 4px; border: 1px solid #999;" placeholder="Nombre de la línea...">
             </div>
             <button wire:click="create" class="cm-btn cm-btn-success" style="font-size: 14px; padding: 6px 16px;">
                 Registrar Línea
@@ -144,7 +144,7 @@
     @else
         <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 20px; background-color: #FFF;">
             <legend style="color: #000; font-weight: bold; font-style: italic; padding: 0 5px;">
-                {{ $editingId ? 'Editar Línea' : 'Nueva Línea' }}
+                {{ $editingId ? 'Editar Línea' : 'Registrar Línea' }}
             </legend>
 
             <form wire:submit="save" style="margin: 0;">

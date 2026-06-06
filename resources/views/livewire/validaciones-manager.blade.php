@@ -65,7 +65,7 @@
     @if ($viewMode === 'list')
         <div style="margin-bottom: 15px;">
             <b>B&uacute;squeda (T&iacute;tulo):</b>
-            <input wire:model.live="search" type="text" style="width: 250px;" placeholder="...">
+            <input wire:model.live="search" type="text" style="width: 250px;" placeholder="Título del proyecto...">
         </div>
 
         <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 10px; margin: 0;">

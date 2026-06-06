@@ -80,7 +80,7 @@
         @if ($listTab === 'validar')
             <div style="margin-bottom: 15px;">
                 <b>Búsqueda (título):</b>
-                <input wire:model.live.debounce.300ms="search" type="text" style="width: 400px;" placeholder="...">
+                <input wire:model.live.debounce.300ms="search" type="text" style="width: 400px;" placeholder="Título del proyecto...">
             </div>
 
             <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 10px; margin: 0;">
@@ -373,7 +373,7 @@
 
         <fieldset style="border: 2px solid #8b0000; border-radius: 6px; padding: 20px; background-color: #FFF;">
             <legend style="color: #000; font-weight: bold; font-style: italic; padding: 0 5px;">
-                {{ $editingId ? 'Actualizar expediente' : 'Nuevo registro de proyecto' }}
+                {{ $editingId ? 'Actualizar expediente' : 'Registrar proyecto' }}
             </legend>
             <form wire:submit="save">
 
@@ -625,7 +625,7 @@
                 <div style="margin-bottom: 15px; border: 1px solid #CCC; border-radius: 4px;">
                     <button type="button" wire:click="toggleAdvanced"
                         style="width:100%; background:#f5f5f5; border:none; padding:8px 12px; text-align:left; font-weight:bold; font-size:12px; cursor:pointer;">
-                        {{ $showAdvanced ? '▼ Ocultar opciones avanzadas' : '▶ Opciones avanzadas (C&amp;T, nota, fecha aprobación)' }}
+                        {{ $showAdvanced ? '▼ Ocultar opciones avanzadas' : '▶ Opciones avanzadas (C&T, nota, fecha aprobación)' }}
                     </button>
                     @if ($showAdvanced)
                         <div style="padding:10px;">
