@@ -8,7 +8,7 @@ class Direccion extends Model
 {
     protected $primaryKey = 'dir_codigo';
 
-    protected $fillable = ['dir_nombre', 'mun_codigo'];
+    protected $fillable = ['dir_calle', 'mun_codigo'];
 
     protected $table = 'direcciones';
 

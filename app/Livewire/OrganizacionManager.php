@@ -102,10 +102,13 @@ class OrganizacionManager extends Component
         $this->org_numero_contacto   = $org->numero_contacto   ?? '';
 
         $this->departamentosForm = [];
-        $orgRows = Organizacion::where('nombre', $nombre)->get();
-        foreach ($orgRows as $row) {
-            if ($row->dep_codigo) {
-                $dep = Departamento::find($row->dep_codigo);
+        $depCodigos = Organizacion::where('nombre', $nombre)
+            ->whereNotNull('org_dep_codigo')
+            ->pluck('dep_codigo');
+        if ($depCodigos->isNotEmpty()) {
+            $departamentos = Departamento::whereIn('dep_codigo', $depCodigos)->get()->keyBy('dep_codigo');
+            foreach ($depCodigos as $dc) {
+                $dep = $departamentos->get($dc);
                 if ($dep) {
                     $this->departamentosForm[] = [
                         'id'               => $dep->id,
@@ -532,7 +535,7 @@ class OrganizacionManager extends Component
         }
 
         // Listado de organizaciones únicas agrupadas por sus datos comunes
-        $organizaciones = Organizacion::when($this->busqueda, fn ($q) => $q->where('nombre', 'like', '%' . $this->busqueda . '%'))
+        $organizaciones = Organizacion::when($this->busqueda, fn ($q) => $q->where('nombre', 'like', $this->busqueda . '%'))
             ->orderBy('nombre')
             ->get()
             ->groupBy(fn ($org) => $org->nombre)

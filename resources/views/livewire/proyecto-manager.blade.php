@@ -376,23 +376,20 @@
                 {{ $editingId ? 'Actualizar expediente' : 'Nuevo registro de proyecto' }}
             </legend>
             <form wire:submit="save">
+
+                {{-- == SECCIÓN PRINCIPAL (siempre visible) == --}}
                 <fieldset style="border: 1px solid #CCC; padding: 10px; margin-bottom: 15px;">
-                    <legend style="font-weight: bold; font-size: 12px;">Datos principales</legend>
+                    <legend style="font-weight: bold; font-size: 12px;">Datos del proyecto</legend>
                     <table width="100%" border="0" cellpadding="4" cellspacing="0" style="font-size: 12px;">
                         <tr>
                             <td width="20%"><b>Título:</b></td>
                             <td colspan="3">
-                                @if ($esGrupoRegistrado ?? false)
-                                    <input type="text" value="{{ $titulo }}" readonly
-                                        style="width: 95%; background:#f5f5f5; color:#555; cursor:not-allowed; border:1px solid #ccc;">
-                                    <small style="color:#777;">Se usa el nombre del grupo de proyecto.</small>
-                                @else
-                                    <input wire:model="titulo" type="text" style="width: 95%;"><span
-                                        class="obligatorio">*</span>
-                                    @error('titulo')
-                                        <br><span class="obligatorio" style="font-size: 11px;">{{ $message }}</span>
-                                    @enderror
-                                @endif
+                                <div style="padding: 4px 0; font-weight: bold; font-size: 14px;">
+                                    {{ $titulo ?: '(seleccione un equipo para auto-llenar el título)' }}
+                                </div>
+                                @error('titulo')
+                                    <span class="obligatorio" style="font-size: 11px;">{{ $message }}</span>
+                                @enderror
                             </td>
                         </tr>
                         <tr>
@@ -412,211 +409,253 @@
                                 @enderror
                             </td>
                         </tr>
+                    </table>
+                </fieldset>
+
+                {{-- == SECCIÓN DOCUMENTOS (siempre visible, arriba) == --}}
+                <fieldset style="border: 1px solid #CCC; padding: 10px; margin-bottom: 15px;">
+                    <legend style="font-weight: bold; font-size: 12px;">Documentos del proyecto</legend>
+                    <table width="100%" border="0" cellpadding="4" cellspacing="0" style="font-size: 12px;">
+                        {{-- Componentes documentales --}}
+                        @if (($usaComponentes ?? false) && isset($componentes_requeridos) && count($componentes_requeridos) > 0)
+                            @foreach ($componentes_requeridos as $comp)
+                                <tr>
+                                    <td width="25%" valign="middle"><b>{{ mb_strtoupper($comp->nombre) }}</b>
+                                        @if ($comp->es_obligatorio)
+                                            <span class="obligatorio">*</span>
+                                        @endif
+                                    </td>
+                                    <td width="45%">
+                                        <input type="file" wire:model="archivos_componentes.{{ $comp->id }}"
+                                            style="width: 100%;">
+                                        @error('archivos_componentes.' . $comp->id)
+                                            <br><span class="obligatorio">{{ $message }}</span>
+                                        @enderror
+                                        <div wire:loading wire:target="archivos_componentes.{{ $comp->id }}"
+                                            style="font-size:10px;color:#0000EE;">Cargando archivo...</div>
+                                    </td>
+                                    <td width="30%">
+                                        @if (isset($archivos_actuales[$comp->id]))
+                                            <a href="{{ Storage::url($archivos_actuales[$comp->id]) }}"
+                                                target="_blank"
+                                                style="color:#0000EE; font-size:11px; font-weight:bold;">[VER DOCUMENTO SUBIDO]</a>
+                                        @else
+                                            <span style="color:#999; font-size:10px;">Sin documento</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @endif
+
+                        {{-- PDF general --}}
                         <tr>
-                            <td valign="top"><b>Documento PDF:</b></td>
-                            <td colspan="3">
-                                <input type="file" wire:model="archivo_proyecto" accept=".pdf,application/pdf">
+                            <td valign="middle"><b>Documento PDF adicional:</b></td>
+                            <td>
+                                <input type="file" wire:model="archivo_proyecto" accept=".pdf,application/pdf"
+                                    style="width: 100%;">
                                 @error('archivo_proyecto')
-                                    <span class="obligatorio">{{ $message }}</span>
+                                    <br><span class="obligatorio">{{ $message }}</span>
                                 @enderror
-                                @if ($archivo_actual)
-                                    <div style="font-size: 10px; margin-top: 4px;"><a
-                                            href="{{ Storage::url($archivo_actual) }}" target="_blank"
-                                            style="color:#0000EE;">Ver PDF actual</a></div>
-                                @endif
                                 <div wire:loading wire:target="archivo_proyecto"
                                     style="font-size:10px;color:#0000EE;">Cargando archivo...</div>
                             </td>
+                            <td>
+                                @if ($archivo_actual)
+                                    <a href="{{ Storage::url($archivo_actual) }}" target="_blank"
+                                        style="color:#0000EE; font-size:11px; font-weight:bold;">[VER PDF ACTUAL]</a>
+                                @else
+                                    <span style="color:#999; font-size:10px;">Sin archivo</span>
+                                @endif
+                            </td>
                         </tr>
-                        <tr>
-                            <td><b>Asignación C&amp;T:</b></td>
-                            <td><label><input type="checkbox" wire:model="asignacion_ct"> ¿Aplica?</label></td>
-                            @if ($editingId)
-                                <td><b>Nota (1-20):</b></td>
-                                <td><input wire:model="calificacion" type="number" min="1" max="20"
-                                        style="width: 60px;"> @error('calificacion')
-                                        <span class="obligatorio">{{ $message }}</span>
-                                    @enderror
-                                </td>
-                            @endif
-                        </tr>
-                        @if ($editingId)
-                            <tr>
-                                <td><b>Fecha aprobación:</b></td>
-                                <td colspan="3"><input wire:model="fecha_aprobacion" type="date">
-                                    @error('fecha_aprobacion')
-                                        <span class="obligatorio">{{ $message }}</span>
-                                    @enderror
-                                </td>
-                            </tr>
-                        @endif
-                        @if (($usaComponentes ?? false) && isset($componentes_requeridos) && count($componentes_requeridos) > 0)
-                            <tr>
-                                <td colspan="4">
-                                    <fieldset style="border: 1px dashed #CCC; padding: 10px;">
-                                        <legend style="font-weight: bold; font-size: 11px; color: #8b0000;">Requisitos
-                                            documentales</legend>
-                                        @foreach ($componentes_requeridos as $comp)
-                                            <div style="margin-bottom: 8px; font-size: 11px;">
-                                                <b>{{ mb_strtoupper($comp->nombre) }}</b>
-                                                @if ($comp->es_obligatorio)
-                                                    <span class="obligatorio">*</span>
-                                                @endif
-                                                <input type="file"
-                                                    wire:model="archivos_componentes.{{ $comp->id }}">
-                                                @if (isset($archivos_actuales[$comp->id]))
-                                                    <span style="font-size: 10px; color: #008000;">(Ya subido)</span>
-                                                @endif
-                                                @error('archivos_componentes.' . $comp->id)
-                                                    <span class="obligatorio">{{ $message }}</span>
-                                                @enderror
-                                            </div>
+                    </table>
+                </fieldset>
+
+                {{-- == SECCIÓN EQUIPO Y COMUNIDAD (desplegable) == --}}
+                <div style="margin-bottom: 15px; border: 1px solid #CCC; border-radius: 4px;">
+                    <button type="button" wire:click="toggleTeamFilters"
+                        style="width:100%; background:#f5f5f5; border:none; padding:8px 12px; text-align:left; font-weight:bold; font-size:12px; cursor:pointer;">
+                        {{ $showTeamFilters ? '▼ Ocultar selección de equipo' : '▶ Seleccionar equipo / grupo de proyecto' }}
+                    </button>
+                    @if ($showTeamFilters)
+                        <div style="padding:10px;">
+                            {{-- Filtros arriba --}}
+                            @if ($esAdmin ?? false)
+                                <div style="padding:4px 0; margin-bottom:8px;">
+                                    <select wire:model.live="filterLapsoEquipo" style="width: 32%;">
+                                        <option value="">- Lapso -</option>
+                                        @foreach ($lapsos as $lap)
+                                            <option value="{{ $lap->id }}">{{ $lap->nombre }}</option>
                                         @endforeach
-                                    </fieldset>
-                                </td>
-                            </tr>
-                        @endif
-                    </table>
-                </fieldset>
+                                    </select>
+                                    <select wire:model.live="filterProgramaEquipo" style="width: 32%;">
+                                        <option value="">- Programa -</option>
+                                        @foreach ($programasEquipo as $pro)
+                                            <option value="{{ $pro->pro_codigo }}">{{ trim($pro->pro_siglas) }}</option>
+                                        @endforeach
+                                    </select>
+                                    <select wire:model.live="filterSeccionEquipo" style="width: 32%;">
+                                        <option value="">- Sección -</option>
+                                        @foreach ($seccionesEquipo as $sec)
+                                            <option value="{{ $sec->sec_codigo }}">{{ trim($sec->sec_nombre) }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
 
-                <fieldset style="border: 1px solid #CCC; padding: 10px; margin-bottom: 15px;">
-                    <legend style="font-weight: bold; font-size: 12px;">Equipo (sección intranet) y comunidad</legend>
-                    @if ($esAdmin ?? false)
-                        <p style="font-size: 10px; color: #555;">Seleccione primero el <b>lapso</b> para cargar
-                            secciones/equipos (evita listas enormes).</p>
-                        <select wire:model.live="filterLapsoEquipo" style="width: 32%; margin-bottom: 6px;">
-                            <option value="">- Lapso -</option>
-                            @foreach ($lapsos as $lap)
-                                <option value="{{ $lap->id }}">{{ $lap->nombre }}</option>
-                            @endforeach
-                        </select>
-                        <select wire:model.live="filterProgramaEquipo" style="width: 32%;"
-                            @disabled(!$filterLapsoEquipo)>
-                            <option value="">- Programa -</option>
-                            @foreach ($programasEquipo as $pro)
-                                <option value="{{ $pro->pro_codigo }}">{{ trim($pro->pro_siglas) }}</option>
-                            @endforeach
-                        </select>
-                        <select wire:model.live="filterSeccionEquipo" style="width: 32%;"
-                            @disabled(!$filterLapsoEquipo)>
-                            <option value="">- Sección -</option>
-                            @foreach ($seccionesEquipo as $sec)
-                                <option value="{{ $sec->sec_codigo }}">{{ trim($sec->sec_nombre) }}</option>
-                            @endforeach
-                        </select>
-                    @endif
-                    <select wire:model.live="equipo_seccion_clave" style="width: 100%; margin-top: 6px;">
-                        <option value="">Seleccione grupo de proyecto o sección…</option>
-                        @foreach ($equipos_disp ?? [] as $eq)
-                            <option value="{{ $eq->clave }}">
-                                {{ $eq->nombre ?? $eq->clave }}
-                                @if (!empty($eq->es_grupo_registrado))
-                                    [grupo de proyecto]
-                                @endif
-                                @if (!empty($eq->lapso_nombre))
-                                    - {{ $eq->lapso_nombre }}
-                                @endif
-                                ({{ $eq->integrantes ?? '?' }} int.)
-                            </option>
-                        @endforeach
-                    </select>
-                    <span class="obligatorio">*</span>
-                    @error('equipo_seccion_clave')
-                        <span class="obligatorio">{{ $message }}</span>
-                    @enderror
-                    @if (!empty($equipoValidado))
-                        <div style="margin-top: 6px; padding: 6px; background: #d4edda; font-size: 10px;">
-                            <b>Validado:</b> {{ $equipoValidado->nombre }}
-                            ({{ ($integrantesEquipo ?? collect())->count() }} integrantes)
-                        </div>
-                    @endif
-                    <br><br>
-                    <b>Comunidad:</b>
-                    @if (($esGrupoRegistrado ?? false) && $comunidadNombreGrupo)
-                        <div style="padding: 6px 0; font-size: 12px;">
-                            <span style="background:#d4edda; border:1px solid #c3e6cb; padding: 4px 10px; border-radius:3px; font-weight:bold;">{{ mb_strtoupper($comunidadNombreGrupo) }}</span>
-                            <small style="color:#777; display:block; margin-top:3px;">Asignada automáticamente por el grupo de proyecto.</small>
-                        </div>
-                        @error('comunidad_id')
-                            <span class="obligatorio">{{ $message }}</span>
-                        @enderror
-                    @else
-                        @if ($esGrupoRegistrado ?? false)
-                            <div style="padding: 4px 0 8px 0; font-size: 11px; color: #8b0000; font-weight: bold;">
-                                El grupo de proyecto seleccionado no tiene una comunidad registrada. Por favor, seleccione una:
+                            {{-- Dropdown de grupos --}}
+                            <div style="margin-bottom: 8px;">
+                                <b>Seleccione el grupo de proyecto:</b><span class="obligatorio">*</span>
+                                <select wire:model.live="equipo_seccion_clave" style="width: 100%;">
+                                    <option value="">Seleccione grupo de proyecto…</option>
+                                    @foreach ($equipos_disp ?? [] as $eq)
+                                        <option value="{{ $eq->clave }}">
+                                            {{ $eq->nombre ?? $eq->clave }}
+                                            @if (!empty($eq->lapso_nombre))
+                                                - {{ $eq->lapso_nombre }}
+                                            @endif
+                                            ({{ $eq->integrantes ?? '?' }} int.)
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('equipo_seccion_clave')
+                                    <span class="obligatorio">{{ $message }}</span>
+                                @enderror
                             </div>
-                        @endif
-                        <select wire:model="comunidad_id" style="width: 100%;">
-                            <option value="">Seleccione...</option>
-                            @foreach ($comunidades as $com)
-                                <option value="{{ $com->id }}">{{ mb_strtoupper($com->nombre) }}</option>
-                            @endforeach
-                        </select>
-                        <span class="obligatorio">*</span>
-                        @error('comunidad_id')
-                            <span class="obligatorio">{{ $message }}</span>
-                        @enderror
-                    @endif
-                </fieldset>
 
-                <fieldset style="border: 1px solid #CCC; padding: 10px;">
-                    <legend style="font-weight: bold; font-size: 12px;">Clasificación (catálogo repositorio)</legend>
-                    <p style="font-size: 10px; color: #555; margin: 0 0 8px 0;">El <b>equipo</b> es el grupo de
-                        proyecto encapsulado; la clave <code>EQSEC:lapso:sección</code> se guarda en
-                        <b>pry_direccion_logica</b>.
-                    </p>
-                    <table width="100%" cellpadding="4" cellspacing="0" style="font-size: 12px;">
-                        <tr>
-                            <td width="20%"><b>Línea inv.:</b></td>
-                            <td width="30%"><select wire:model="linea_investigacion_id" style="width: 95%;">
-                                    <option value="">Seleccione...</option>
-                                    @foreach ($lineas as $l)
-                                        <option value="{{ $l->id }}">
-                                            {{ Str::limit($l->nombre_investigacion, 40) }}</option>
-                                    @endforeach
-                                </select>
-                                <span class="obligatorio">*</span> @error('linea_investigacion_id')
-                                    <span class="obligatorio">{{ $message }}</span>
-                                @enderror
-                            </td>
-                            <td width="20%"><b>Metodología:</b></td>
-                            <td width="30%"><select wire:model="metodologia_id" style="width: 95%;">
-                                    <option value="">Seleccione...</option>
-                                    @foreach ($metodologias as $m)
-                                        <option value="{{ $m->id }}">{{ $m->nombre }}</option>
-                                    @endforeach
-                                </select>
-                                <span class="obligatorio">*</span> @error('metodologia_id')
-                                    <span class="obligatorio">{{ $message }}</span>
-                                @enderror
-                            </td>
-                        </tr>
-                        <tr>
-                            <td><b>Tipo publicación:</b></td>
-                            <td><select wire:model="tipo_publicacion_id" style="width: 95%;">
-                                    <option value="">Seleccione...</option>
-                                    @foreach ($tipos_publicacion as $tp)
-                                        <option value="{{ $tp->id }}">{{ $tp->nombre }}</option>
-                                    @endforeach
-                                </select>
-                                <span class="obligatorio">*</span> @error('tipo_publicacion_id')
-                                    <span class="obligatorio">{{ $message }}</span>
-                                @enderror
-                            </td>
-                            <td><b>Tipo investigación:</b></td>
-                            <td><select wire:model="tipo_investigacion_id" style="width: 95%;">
-                                    <option value="">Seleccione...</option>
-                                    @foreach ($tipos_investigacion as $ti)
-                                        <option value="{{ $ti->id }}">{{ $ti->nombre }}</option>
-                                    @endforeach
-                                </select>
-                                <span class="obligatorio">*</span> @error('tipo_investigacion_id')
-                                    <span class="obligatorio">{{ $message }}</span>
-                                @enderror
-                            </td>
-                        </tr>
-                    </table>
-                </fieldset>
+                            {{-- Equipo validado --}}
+                            @if (!empty($equipoValidado))
+                                <div style="margin: 6px 0; padding: 6px; background: #d4edda; font-size: 10px;">
+                                    <b>Validado:</b> {{ $equipoValidado->nombre }}
+                                    @if (!empty($programa_id_derived) || !empty($trayecto_derived))
+                                        &nbsp;|&nbsp; Programa: {{ $programa_id_derived ?? '?' }}
+                                        , Trayecto: {{ $trayecto_derived ?: '?' }}
+                                    @endif
+                                    ({{ ($integrantesEquipo ?? collect())->count() }} integrantes)
+                                </div>
+                            @endif
+
+                            {{-- Comunidad --}}
+                            <div style="margin-top: 10px;">
+                                <b>Comunidad:</b>
+                                @if (($esGrupoRegistrado ?? false) && $comunidadNombreGrupo)
+                                    <div style="padding: 6px 0; font-size: 12px;">
+                                        <span style="background:#d4edda; border:1px solid #c3e6cb; padding: 4px 10px; border-radius:3px; font-weight:bold;">{{ mb_strtoupper($comunidadNombreGrupo) }}</span>
+                                        <small style="color:#777; display:block; margin-top:3px;">Asignada automáticamente por el grupo de proyecto.</small>
+                                    </div>
+                                @elseif ($equipo_seccion_clave && ($esGrupoRegistrado ?? false))
+                                    <div style="background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; padding:10px; margin:4px 0; border-radius:4px; font-size:12px; font-weight:bold;">
+                                        El grupo de proyecto seleccionado no tiene una comunidad asignada. Debe asignarle una desde la gestión del grupo antes de registrar el proyecto.
+                                    </div>
+                                    @error('comunidad_id')
+                                        <br><span class="obligatorio">{{ $message }}</span>
+                                    @enderror
+                                @else
+                                    <span style="color:#999; font-size:11px;">(se asignará automáticamente al seleccionar un grupo)</span>
+                                @endif
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- == SECCIÓN CLASIFICACIÓN (colapsable, oculta por defecto) == --}}
+                <div style="margin-bottom: 15px; border: 1px solid #CCC; border-radius: 4px;">
+                    <button type="button" wire:click="toggleClassification"
+                        style="width:100%; background:#f5f5f5; border:none; padding:8px 12px; text-align:left; font-weight:bold; font-size:12px; cursor:pointer;">
+                        {{ $showClassification ? '▼ Ocultar clasificación' : '▶ Clasificación del proyecto (línea, metodología, etc.)' }}
+                    </button>
+                    @if ($showClassification)
+                        <div style="padding:10px;">
+                            <table width="100%" cellpadding="4" cellspacing="0" style="font-size: 12px;">
+                                <tr>
+                                    <td width="20%"><b>Línea inv.:</b></td>
+                                    <td width="30%"><select wire:model="linea_investigacion_id" style="width: 95%;">
+                                            <option value="">Seleccione...</option>
+                                            @foreach ($lineas as $l)
+                                                <option value="{{ $l->id }}">
+                                                    {{ Str::limit($l->nombre_investigacion, 40) }}</option>
+                                            @endforeach
+                                        </select>
+                                        <span class="obligatorio">*</span> @error('linea_investigacion_id')
+                                            <span class="obligatorio">{{ $message }}</span>
+                                        @enderror
+                                    </td>
+                                    <td width="20%"><b>Metodología:</b></td>
+                                    <td width="30%"><select wire:model="metodologia_id" style="width: 95%;">
+                                            <option value="">Seleccione...</option>
+                                            @foreach ($metodologias as $m)
+                                                <option value="{{ $m->id }}">{{ $m->nombre }}</option>
+                                            @endforeach
+                                        </select>
+                                        <span class="obligatorio">*</span> @error('metodologia_id')
+                                            <span class="obligatorio">{{ $message }}</span>
+                                        @enderror
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><b>Tipo publicación:</b></td>
+                                    <td><select wire:model="tipo_publicacion_id" style="width: 95%;">
+                                            <option value="">Seleccione...</option>
+                                            @foreach ($tipos_publicacion as $tp)
+                                                <option value="{{ $tp->id }}">{{ $tp->nombre }}</option>
+                                            @endforeach
+                                        </select>
+                                        <span class="obligatorio">*</span> @error('tipo_publicacion_id')
+                                            <span class="obligatorio">{{ $message }}</span>
+                                        @enderror
+                                    </td>
+                                    <td><b>Tipo investigación:</b></td>
+                                    <td><select wire:model="tipo_investigacion_id" style="width: 95%;">
+                                            <option value="">Seleccione...</option>
+                                            @foreach ($tipos_investigacion as $ti)
+                                                <option value="{{ $ti->id }}">{{ $ti->nombre }}</option>
+                                            @endforeach
+                                        </select>
+                                        <span class="obligatorio">*</span> @error('tipo_investigacion_id')
+                                            <span class="obligatorio">{{ $message }}</span>
+                                        @enderror
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- == SECCIÓN AVANZADO (colapsable, oculta por defecto) == --}}
+                <div style="margin-bottom: 15px; border: 1px solid #CCC; border-radius: 4px;">
+                    <button type="button" wire:click="toggleAdvanced"
+                        style="width:100%; background:#f5f5f5; border:none; padding:8px 12px; text-align:left; font-weight:bold; font-size:12px; cursor:pointer;">
+                        {{ $showAdvanced ? '▼ Ocultar opciones avanzadas' : '▶ Opciones avanzadas (C&amp;T, nota, fecha aprobación)' }}
+                    </button>
+                    @if ($showAdvanced)
+                        <div style="padding:10px;">
+                            <table width="100%" cellpadding="4" cellspacing="0" style="font-size: 12px;">
+                                <tr>
+                                    <td width="20%"><b>Asignación C&amp;T:</b></td>
+                                    <td width="30%"><label><input type="checkbox" wire:model="asignacion_ct"> ¿Aplica?</label></td>
+                                    @if ($editingId)
+                                        <td width="20%"><b>Nota (1-20):</b></td>
+                                        <td width="30%"><input wire:model="calificacion" type="number" min="1" max="20"
+                                                style="width: 60px;"> @error('calificacion')
+                                                <span class="obligatorio">{{ $message }}</span>
+                                            @enderror
+                                        </td>
+                                    @endif
+                                </tr>
+                                @if ($editingId)
+                                    <tr>
+                                        <td><b>Fecha aprobación:</b></td>
+                                        <td colspan="3"><input wire:model="fecha_aprobacion" type="date">
+                                            @error('fecha_aprobacion')
+                                                <span class="obligatorio">{{ $message }}</span>
+                                            @enderror
+                                        </td>
+                                    </tr>
+                                @endif
+                            </table>
+                        </div>
+                    @endif
+                </div>
 
                 <div style="text-align: center; margin-top: 20px;">
                     <button type="button" wire:click="cancel" class="pgm-btn-cancel" style="margin-right: 10px;">Cancelar</button>

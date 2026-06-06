@@ -24,8 +24,6 @@ class ProjectProfessorManager extends Component
 
     public array $selectedSection = [];
 
-    public ?int $activeAdminCoordinacion = null;
-
     public function mount(IntranetProfessorService $professorService): void
     {
         $lapsos = $professorService->lapsosActivos();
@@ -82,10 +80,7 @@ class ProjectProfessorManager extends Component
             [
                 'anio' => $this->selectedYear[$cedula] ?? null,
                 'seccion' => $this->selectedSection[$cedula] ?? null,
-                'coordinacion_id' => $this->activeAdminCoordinacion,
             ],
-            $this->activeAdminCoordinacion,
-            auth()->user()->hasRole('administrador'),
         );
 
         session()->flash($result['flash'], $result['message']);

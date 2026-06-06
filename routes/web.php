@@ -57,8 +57,6 @@ Route::middleware(['auth', 'active.role'])->group(function () {
     Route::view('/configuracion', 'configuracion.index')->name('configuracion');
 
     Route::middleware('role:administrador')->group(function () {
-        Route::view('/configuracion/coordinadores', 'configuracion.coordinadores')->name('coordinadores.index');
-
         // Módulo Organizaciones (solo Gestionador)
         Route::view('/organizaciones', 'organizaciones.index')->name('organizaciones.index');
 

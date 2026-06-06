@@ -133,18 +133,6 @@ class ModuloRepositorioService
         return $modelClass::create($legacyAttributes);
     }
 
-    public function coordinacionesActivas(): Collection
-    {
-        return Cache::remember('modulo_coordinaciones_activas', now()->addMinutes(10), function () {
-            if (! $this->tablaExiste('coordinaciones')) {
-                return collect();
-            }
-
-            return $this->queryModel(\App\Models\Coordinacion::class)
-                ->get();
-        });
-    }
-
     public function lineasInvestigacionActivas(): Collection
     {
         return Cache::remember('modulo_lineas_investigacion_activas', now()->addMinutes(10), function () {

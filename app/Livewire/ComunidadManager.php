@@ -95,22 +95,33 @@ class ComunidadManager extends Component
 
     public function agregarContacto(): void
     {
-        $this->contactos[] = ['nombre' => '', 'apellido' => '', 'correo' => '', 'correo_confirmacion' => '', 'prefijo' => '0424', 'telefono' => '', 'cargo' => '', 'cargo_custom' => ''];
+        $this->contactos[] = ['nombre' => '', 'apellido' => '', 'correo' => '', 'correo_confirmacion' => '', 'prefijo' => '0424', 'telefono' => '', 'cargo' => '', 'mostrar_input_cargo' => false, 'cargo_custom' => ''];
     }
 
-    public function setCargoSeleccion(int $index): void
+    public function mostrarCargoPersonalizado(int $index): void
     {
-        $this->contactos[$index]['cargo'] = '';
+        $this->contactos[$index]['mostrar_input_cargo'] = true;
+    }
+
+    public function aceptarCargoPersonalizado(int $index): void
+    {
+        $custom = trim($this->contactos[$index]['cargo_custom'] ?? '');
+        if ($custom !== '') {
+            $this->contactos[$index]['cargo'] = $custom;
+        }
+        $this->contactos[$index]['mostrar_input_cargo'] = false;
+    }
+
+    public function cancelarCargoPersonalizado(int $index): void
+    {
         $this->contactos[$index]['cargo_custom'] = '';
+        $this->contactos[$index]['mostrar_input_cargo'] = false;
     }
 
     private function normalizarContactos(): array
     {
         return array_map(function ($c) {
-            if (($c['cargo'] ?? '') === '__otro__') {
-                $c['cargo'] = trim($c['cargo_custom'] ?? '') ?: '';
-            }
-            unset($c['cargo_custom']);
+            unset($c['cargo_custom'], $c['mostrar_input_cargo']);
             return $c;
         }, $this->contactos);
     }

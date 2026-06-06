@@ -18,7 +18,7 @@ class DbHelper
 
     protected static ?int $intranetPort = null;
 
-    protected const CACHE_TTL = 300;
+    protected const CACHE_TTL = 3600;
 
     protected const CACHE_KEY = 'dbhelper_intranet_available';
 
@@ -33,10 +33,13 @@ class DbHelper
 
         $cached = Cache::get(self::CACHE_KEY);
         if ($cached === 'intranet') {
-            self::$connectionName = 'intranet';
-            self::$usingIntranet = true;
-            self::$resolved = true;
-            return self::$connectionName;
+            if (self::intranetAlcanzable()) {
+                self::$connectionName = 'intranet';
+                self::$usingIntranet = true;
+                self::$resolved = true;
+                return self::$connectionName;
+            }
+            Cache::forget(self::CACHE_KEY);
         }
         if ($cached === 'simulacion') {
             self::$connectionName = 'simulacion';

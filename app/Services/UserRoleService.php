@@ -77,31 +77,36 @@ class UserRoleService
         $conn = \App\Helpers\DualDatabase::academicConnection();
         $roles = [];
 
-        $userExt = DB::connection($conn)
-            ->table('usuario')
-            ->whereRaw('TRIM(usu_cedula) = ?', [$cedula])
-            ->first();
+        try {
+            $userExt = DB::connection($conn)
+                ->table('usuario')
+                ->whereRaw('TRIM(usu_cedula) = ?', [$cedula])
+                ->first();
 
-        if ($userExt) {
-            $nombre = trim((string) ($userExt->usu_nombre ?? ''));
-            if ($nombre === 'PROGRAMADOR' || $nombre === 'admin') {
-                $roles['administrador'] = $this->label('administrador');
+            if ($userExt) {
+                $nombre = trim((string) ($userExt->usu_nombre ?? ''));
+                if ($nombre === 'PROGRAMADOR' || $nombre === 'admin') {
+                    $roles['administrador'] = $this->label('administrador');
+                }
+
+                $codRol = $userExt->usu_cod_rol ?? null;
+                $mapped = config('roles.usu_cod_rol_map', []);
+                if ($codRol !== null && isset($mapped[(int) $codRol])) {
+                    $slug = $mapped[(int) $codRol];
+                    $roles[$slug] = $this->label($slug);
+                }
             }
 
-            $codRol = $userExt->usu_cod_rol ?? null;
-            $mapped = config('roles.usu_cod_rol_map', []);
-            if ($codRol !== null && isset($mapped[(int) $codRol])) {
-                $slug = $mapped[(int) $codRol];
-                $roles[$slug] = $this->label($slug);
+            if (DB::connection($conn)->table('estudiante')->whereRaw('TRIM(est_cedula) = ?', [$cedula])->exists()) {
+                $roles['estudiante'] = $this->label('estudiante');
             }
-        }
 
-        if (DB::connection($conn)->table('estudiante')->whereRaw('TRIM(est_cedula) = ?', [$cedula])->exists()) {
-            $roles['estudiante'] = $this->label('estudiante');
-        }
-
-        if (app(IntranetProfessorService::class)->esProfesorProyectoVigente($cedula)) {
-            $roles['profesor proyecto'] = $this->label('profesor proyecto');
+            if (app(IntranetProfessorService::class)->esProfesorProyectoVigente($cedula)) {
+                $roles['profesor proyecto'] = $this->label('profesor proyecto');
+            }
+        } catch (\Throwable $e) {
+            \App\Helpers\DbHelper::handleQueryError($e);
+            \Illuminate\Support\Facades\Log::warning('Error detectando roles desde intranet: ' . $e->getMessage());
         }
 
         // Roles locales del sistema (tablas usuarios_externos y rol_externo)

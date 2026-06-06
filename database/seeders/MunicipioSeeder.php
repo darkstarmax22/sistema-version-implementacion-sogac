@@ -86,13 +86,13 @@ class MunicipioSeeder extends Seeder
         ];
 
         foreach ($municipiosPorEstado as $nombreEstado => $municipios) {
-            $estado = Estado::where('nombre', $nombreEstado)->first();
+                $estado = Estado::where('est_nombre', $nombreEstado)->first();
             
             if ($estado) {
                 foreach ($municipios as $nombreMunicipio) {
                     Municipio::firstOrCreate([
-                        'nombre' => $nombreMunicipio,
-                        'estado_id' => $estado->id
+                        'mun_nombre' => $nombreMunicipio,
+                        'est_codigo' => $estado->est_codigo
                     ]);
                 }
             }

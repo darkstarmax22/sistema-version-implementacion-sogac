@@ -108,7 +108,7 @@
                             <td align="center">{{ $loop->iteration }}</td>
                             <td>
                                 <span style="font-weight: bold;">{{ $c->nombre }}</span>
-                                <br><span style="font-size: 9px; color: #555;">{{ $c->direccion?->municipio?->estado?->est_nombre ?? '' }} / {{ $c->direccion?->municipio?->mun_nombre ?? '' }} - {{ $c->direccion?->dir_nombre ?? '' }}</span>
+                                <br><span style="font-size: 9px; color: #555;">{{ $c->direccion?->municipio?->estado?->est_nombre ?? '' }} / {{ $c->direccion?->municipio?->mun_nombre ?? '' }} - {{ $c->direccion?->dir_calle ?? '' }}</span>
                             </td>
                             <td align="center">{{ $c->rif }}</td>
                             <td align="center">{{ $c->correo }}<br><b>{{ $c->numero_telefono }}</b></td>
@@ -327,10 +327,11 @@
 
                                 <div>
                                     <label style="display: block; font-weight: bold; margin-bottom: 4px; color: #000;">Cargo:</label>
-                                    @if (($contactos[$i]['cargo'] ?? '') === '__otro__')
+                                    @if ($contactos[$i]['mostrar_input_cargo'] ?? false)
                                         <div style="display: flex; gap: 4px; align-items: center;">
                                             <input wire:model="contactos.{{ $i }}.cargo_custom" type="text" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; box-sizing: border-box;" placeholder="Escriba el cargo...">
-                                            <button type="button" wire:click="setCargoSeleccion({{ $i }})" style="padding: 6px 10px; border: 1px solid #aaa; border-radius: 4px; background: #f4f4f4; cursor: pointer; font-size: 11px; white-space: nowrap;">⇦ Volver</button>
+                                            <button type="button" wire:click="aceptarCargoPersonalizado({{ $i }})" style="padding: 6px 10px; border: none; border-radius: 4px; background: #19692e; color: #fff; cursor: pointer; font-size: 11px; white-space: nowrap;">✓</button>
+                                            <button type="button" wire:click="cancelarCargoPersonalizado({{ $i }})" style="padding: 6px 10px; border: 1px solid #aaa; border-radius: 4px; background: #f4f4f4; cursor: pointer; font-size: 11px; white-space: nowrap;">✗</button>
                                         </div>
                                     @else
                                         <div style="display: flex; gap: 4px; align-items: center;">
@@ -339,8 +340,8 @@
                                                 @foreach (config('comunidades.cargos_contacto', []) as $key => $label)
                                                     <option value="{{ $key }}">{{ $label }}</option>
                                                 @endforeach
-                                                <option value="__otro__">+ Otro (escribir)...</option>
                                             </select>
+                                            <button type="button" wire:click="mostrarCargoPersonalizado({{ $i }})" title="Añadir otro cargo" style="padding: 6px 10px; border: 1px solid #aaa; border-radius: 4px; background: #fff; cursor: pointer; font-size: 14px; line-height: 1; white-space: nowrap;">+</button>
                                         </div>
                                     @endif
                                     @error('contactos.' . $i . '.cargo')

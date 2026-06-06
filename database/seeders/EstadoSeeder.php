@@ -21,7 +21,7 @@ class EstadoSeeder extends Seeder
         ];
 
         foreach ($estados as $estado) {
-            \App\Models\Estado::create(['nombre' => $estado]);
+            \App\Models\Estado::create(['est_nombre' => $estado]);
         }
     }
 }

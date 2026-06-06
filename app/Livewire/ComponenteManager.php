@@ -3,11 +3,10 @@
 namespace App\Livewire;
 
 use App\Models\Componente;
-use App\Models\Trayecto;
-use App\Helpers\DbHelper;
 use App\Services\AcademicCatalog;
 use App\Services\IntranetEquipoSeccionService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -21,7 +20,7 @@ class ComponenteManager extends Component
     public $viewMode = 'list';
     public $editingId = null;
 
-    public $coordinacion_id = '';
+    public $programa_id = '';
     public $anio = '';
 
     public Collection $trayectosPrograma;
@@ -39,7 +38,7 @@ class ComponenteManager extends Component
     protected function rules()
     {
         return [
-            'coordinacion_id' => 'required',
+            'programa_id' => 'required',
             'anio' => 'required|string',
             'rows.*.nombre' => 'required|min:3',
             'rows.*.es_obligatorio' => 'boolean',
@@ -48,7 +47,7 @@ class ComponenteManager extends Component
 
     protected $messages = [
         'rows.*.nombre.required' => 'Debe nombrar el documento en esta fila.',
-        'coordinacion_id.required' => 'Debe asignar una PNF / Coordinación rectora.',
+        'programa_id.required' => 'Debe asignar un Programa.',
         'anio.required' => 'Debe asignarle el trayecto (I, II, III, IV).',
     ];
 
@@ -67,7 +66,7 @@ class ComponenteManager extends Component
         $this->resetPage();
     }
 
-    public function updatedCoordinacionId($value)
+    public function updatedProgramaId($value)
     {
         $this->anio = '';
         $this->loadTrayectosPrograma();
@@ -75,13 +74,13 @@ class ComponenteManager extends Component
 
     protected function loadTrayectosPrograma()
     {
-        if ($this->coordinacion_id === '') {
+        if ($this->programa_id === '') {
             $this->trayectosPrograma = collect();
             return;
         }
 
         $this->trayectosPrograma = app(IntranetEquipoSeccionService::class)
-            ->trayectosEnLapso(null, (int) $this->coordinacion_id);
+            ->trayectosEnLapso(null, (int) $this->programa_id);
     }
 
     public function create()
@@ -119,7 +118,7 @@ class ComponenteManager extends Component
             abort(404);
         }
 
-        $this->coordinacion_id = (string) $comp->coordinacion_id;
+        $this->programa_id = (string) $comp->programa_id;
         $this->anio = $comp->anio;
 
         $this->rows = [
@@ -144,7 +143,7 @@ class ComponenteManager extends Component
     {
         $this->editingId = null;
         $this->nombre = '';
-        $this->coordinacion_id = '';
+        $this->programa_id = '';
         $this->anio = '';
         $this->es_obligatorio = true;
         $this->rows = [];
@@ -162,7 +161,7 @@ class ComponenteManager extends Component
                     if ($comp) {
                         $comp->update([
                             'nombre' => $row['nombre'],
-                            'coordinacion_id' => $this->coordinacion_id,
+                            'programa_id' => $this->programa_id,
                             'anio' => $this->anio,
                             'es_obligatorio' => $row['es_obligatorio'],
                         ]);
@@ -170,7 +169,7 @@ class ComponenteManager extends Component
                 } else {
                     Componente::create([
                         'nombre' => $row['nombre'],
-                        'coordinacion_id' => $this->coordinacion_id,
+                        'programa_id' => $this->programa_id,
                         'anio' => $this->anio,
                         'es_obligatorio' => $row['es_obligatorio'],
                         'estado_logico' => true,
@@ -188,7 +187,7 @@ class ComponenteManager extends Component
             foreach ($this->rows as $row) {
                 Componente::create([
                     'nombre' => $row['nombre'],
-                    'coordinacion_id' => $this->coordinacion_id,
+                    'programa_id' => $this->programa_id,
                     'anio' => $this->anio,
                     'es_obligatorio' => $row['es_obligatorio'],
                     'estado_logico' => true,
@@ -224,32 +223,45 @@ class ComponenteManager extends Component
 
         if ($this->search !== '') {
             $query->where(function ($q) {
-                $q->where('nombre', 'like', "%{$this->search}%")
-                  ->orWhere('anio', 'like', "%{$this->search}%");
+                $q->where('nombre', 'like', $this->search . '%')
+                  ->orWhere('anio', 'like', $this->search . '%');
             });
         }
 
         if ($this->filterPrograma !== '') {
-            $query->where('coordinacion_id', $this->filterPrograma);
+            $query->where('programa_id', $this->filterPrograma);
         }
 
         if ($this->filterTrayecto !== '') {
             $query->where('anio', $this->filterTrayecto);
         }
 
-        $trayectosDb = Trayecto::on(DbHelper::connection())
-            ->whereNotNull('tra_nombre')
-            ->orderBy('tra_nombre')
-            ->pluck('tra_nombre')
-            ->unique()
-            ->values()
-            ->toArray();
+        $items = $query->latest('id')->paginate(10);
+        $this->cargarNombresPrograma($items);
 
         return [
-            'listaRegistros' => $query->latest('id')->paginate(10),
+            'listaRegistros' => $items,
             'programas' => app(AcademicCatalog::class)->programasForSelect(),
-            'trayectos' => $trayectosDb ?: ['I', 'II', 'III', 'IV', 'V', 'VI'],
+            'trayectos' => ['I', 'II', 'III', 'IV', 'V', 'VI'],
         ];
+    }
+
+    protected function cargarNombresPrograma($items): void
+    {
+        $ids = $items->pluck('programa_id')->filter()->unique()->values()->toArray();
+        if (empty($ids)) {
+            return;
+        }
+        try {
+            $progs = DB::connection(DbHelper::connection())
+                ->table('programa')
+                ->whereIn('pro_codigo', $ids)
+                ->pluck('pro_nombre', 'pro_codigo');
+            $items->each(function ($item) use ($progs) {
+                $item->setAttribute('nombre_programa_cache', $progs[$item->programa_id] ?? "Programa #{$item->programa_id}");
+            });
+        } catch (\Throwable) {
+        }
     }
 
     public function render()

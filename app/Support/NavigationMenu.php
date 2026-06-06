@@ -60,7 +60,6 @@ class NavigationMenu
             'canValidateProjects'  => app(ProyectoGestionService::class)->usuarioPuedeValidar($user),
             'canRegisterProject'   => $user->puedeRegistrarProyecto(),
             'canManageSystemConfig'=> $isAdmin || $isCoordinator,
-            'canManageCoordinators'=> $isAdmin,
             'canManageOrganizaciones' => trim((string) $user->usu_cedula) === '13354832', // Solo Gestionador (cédula 13354832)
         ];
 

@@ -3,6 +3,8 @@
 namespace App\Livewire;
 
 use App\Models\LineaInvestigacion;
+use App\Helpers\DbHelper;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -13,7 +15,7 @@ class LineaInvestigacionManager extends Component
     public $nombre_investigacion = '';
     public $descripcion = '';
     public $area_de_investigacion = '';
-    public $coordinacion_id = '';
+    public $programa_id = '';
     public $search = '';
     public $editingId = null;
     public $viewMode = 'list';
@@ -22,7 +24,7 @@ class LineaInvestigacionManager extends Component
         'nombre_investigacion' => 'required|min:3|max:255',
         'descripcion' => 'required|max:500',
         'area_de_investigacion' => 'required|max:255',
-        'coordinacion_id' => 'required',
+        'programa_id' => 'required',
     ];
 
     public function messages()
@@ -35,7 +37,7 @@ class LineaInvestigacionManager extends Component
             'descripcion.max' => 'La descripción no debe exceder los 500 caracteres.',
             'area_de_investigacion.required' => 'El área académica es obligatoria.',
             'area_de_investigacion.max' => 'El área no debe exceder los 255 caracteres.',
-            'coordinacion_id.required' => 'Seleccionar un Programa / Coordinación es obligatorio.',
+            'programa_id.required' => 'Seleccionar un Programa es obligatorio.',
         ];
     }
 
@@ -53,7 +55,7 @@ class LineaInvestigacionManager extends Component
         $this->nombre_investigacion = $item->nombre_investigacion;
         $this->descripcion = $item->descripcion;
         $this->area_de_investigacion = $item->area_de_investigacion;
-        $this->coordinacion_id = $item->coordinacion_id;
+        $this->programa_id = $item->programa_id;
         $this->viewMode = 'form';
     }
 
@@ -68,7 +70,7 @@ class LineaInvestigacionManager extends Component
         $this->nombre_investigacion = '';
         $this->descripcion = '';
         $this->area_de_investigacion = '';
-        $this->coordinacion_id = '';
+        $this->programa_id = '';
         $this->editingId = null;
     }
 
@@ -81,7 +83,7 @@ class LineaInvestigacionManager extends Component
                 'nombre_investigacion' => $this->nombre_investigacion,
                 'descripcion' => $this->descripcion,
                 'area_de_investigacion' => $this->area_de_investigacion,
-                'coordinacion_id' => $this->coordinacion_id,
+                'programa_id' => $this->programa_id,
             ],
             $this->editingId,
         );
@@ -109,13 +111,37 @@ class LineaInvestigacionManager extends Component
 
     public function with()
     {
+        $items = LineaInvestigacion::where(function ($q) {
+                $q->where('nombre_investigacion', 'like', $this->search . '%')
+                  ->orWhere('area_de_investigacion', 'like', $this->search . '%');
+            })
+            ->latest()
+            ->paginate(10);
+
+        $this->cargarNombresPrograma($items);
+
         return [
-            'items' => LineaInvestigacion::where('nombre_investigacion', 'like', '%' . $this->search . '%')
-                ->orWhere('area_de_investigacion', 'like', '%' . $this->search . '%')
-                ->latest()
-                ->paginate(10),
+            'items' => $items,
             'programas' => app(\App\Services\AcademicCatalog::class)->programasForSelect(),
         ];
+    }
+
+    protected function cargarNombresPrograma($items): void
+    {
+        $ids = $items->pluck('programa_id')->filter()->unique()->values()->toArray();
+        if (empty($ids)) {
+            return;
+        }
+        try {
+            $progs = DB::connection(DbHelper::connection())
+                ->table('programa')
+                ->whereIn('pro_codigo', $ids)
+                ->pluck('pro_nombre', 'pro_codigo');
+            $items->each(function ($item) use ($progs) {
+                $item->setAttribute('nombre_programa_cache', $progs[$item->programa_id] ?? "Programa #{$item->programa_id}");
+            });
+        } catch (\Throwable) {
+        }
     }
 
     public function render()

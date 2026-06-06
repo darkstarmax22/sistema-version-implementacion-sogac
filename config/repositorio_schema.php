@@ -56,7 +56,7 @@ return [
             'nombre_investigacion' => 'lin_nombre_investigacion',
             'descripcion' => 'lin_descripcion',
             'area_de_investigacion' => 'lin_area_de_investigacion',
-            'coordinacion_id' => 'coord_codigo',
+            'programa_id' => 'coord_codigo',
             'activo' => 'lin_estado',
         ],
         'values' => [
@@ -99,23 +99,12 @@ return [
         ],
     ],
 
-    'coordinaciones' => [
-        'primary_key' => 'coord_codigo',
-        'columns' => [
-            'id' => 'coord_codigo',
-            'nombre' => 'coord_nombre',
-            'descripcion' => 'coord_descripcion',
-            'activo' => 'coord_activo',
-            'alertar_comunidades' => 'coord_alertar_comunidades',
-        ],
-    ],
-
     'componentes' => [
         'primary_key' => 'comp_codigo',
         'columns' => [
             'id' => 'comp_codigo',
             'nombre' => 'comp_nombre',
-            'coordinacion_id' => 'coord_codigo',
+            'programa_id' => 'coord_codigo',
             'anio' => 'comp_anio',
             'es_obligatorio' => 'comp_es_obligatorio',
             'estado_logico' => 'comp_estado_logico',

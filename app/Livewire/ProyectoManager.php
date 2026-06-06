@@ -62,6 +62,16 @@ class ProyectoManager extends Component
 
     public ?string $archivo_actual = '';
 
+    public bool $showTeamFilters = false;
+
+    public bool $showClassification = false;
+
+    public bool $showAdvanced = false;
+
+    public ?string $programa_id_derived = null;
+
+    public ?string $trayecto_derived = '';
+
     public ?string $search = '';
 
     public ?string $motivo_rechazo = '';
@@ -129,13 +139,6 @@ class ProyectoManager extends Component
         $this->resetFormulario();
         $this->fecha_subida = now()->format('Y-m-d');
 
-        if ($gestion->usuarioEsAdminEnSistema($user)) {
-            $lapso = \App\Models\LapsoAcademico::vigente();
-            if ($lapso) {
-                $this->filterLapsoEquipo = (string) $lapso->lap_codigo;
-            }
-        }
-
         $this->viewMode = 'form';
         $this->aplicarSyncEquipo($gestion);
     }
@@ -148,6 +151,21 @@ class ProyectoManager extends Component
         $this->selectedProjectId = null;
         $this->motivo_rechazo = '';
         $this->resetPage();
+    }
+
+    public function toggleTeamFilters(): void
+    {
+        $this->showTeamFilters = ! $this->showTeamFilters;
+    }
+
+    public function toggleClassification(): void
+    {
+        $this->showClassification = ! $this->showClassification;
+    }
+
+    public function toggleAdvanced(): void
+    {
+        $this->showAdvanced = ! $this->showAdvanced;
     }
 
     public function updatingListTab(): void
@@ -173,9 +191,8 @@ class ProyectoManager extends Component
             'tipo_publicacion_id.required' => 'Debe seleccionar un tipo de publicacion.',
             'tipo_investigacion_id.required' => 'Debe seleccionar un tipo de investigacion.',
             'lapso_academico_id.required' => 'Debe seleccionar un lapso academico.',
-            'coordinacion_id.required' => 'Debe seleccionar una Coordinacion.',
             'equipo_seccion_clave.required' => 'Debe validar el equipo (seccion intranet).',
-            'comunidad_id.required' => 'Debe seleccionar la comunidad del proyecto.',
+            'comunidad_id.required' => 'La comunidad es obligatoria. El grupo seleccionado debe tener una comunidad asignada.',
             'trayecto.required' => 'El trayecto es obligatorio.',
             'motivo_rechazo.required' => 'Debe indicar el motivo de rechazo.',
             'motivo_rechazo.min' => 'El motivo debe tener al menos 10 caracteres.',
@@ -194,40 +211,87 @@ class ProyectoManager extends Component
     {
         $clave = $this->equipo_seccion_clave ?? '';
 
+        $this->programa_id_derived = null;
+        $this->trayecto_derived = '';
+
+        if ($clave === '') {
+            $this->esGrupoRegistrado = false;
+            $this->comunidadNombreGrupo = null;
+            $this->titulo = '';
+            $this->comunidad_id = '';
+            return;
+        }
+
         // Si se selecciona un grupo de proyecto registrado (EQGRP:)
         if (str_starts_with($clave, GrupoProyectoService::PREFIJO . ':')) {
             $grupo = $grupos->obtenerPorClave($clave);
             if ($grupo) {
                 $this->esGrupoRegistrado = true;
-                // Auto-rellenar título con el nombre del grupo
                 $this->titulo = $grupo->nombre ?? '';
-                // Auto-rellenar comunidad con la comunidad registrada del grupo
                 if (!empty($grupo->com_codigo)) {
                     $this->comunidad_id = (string) $grupo->com_codigo;
-                    // Buscar el nombre de la comunidad para mostrarlo en la vista
                     $comunidad = \App\Models\Comunidad::find($grupo->com_codigo);
                     $this->comunidadNombreGrupo = $comunidad?->nombre;
                 } else {
                     $this->comunidad_id = '';
                     $this->comunidadNombreGrupo = null;
                 }
-                // Actualizar lapso si se puede extraer del grupo
                 if (!empty($grupo->lap_codigo)) {
                     $this->filterLapsoEquipo = (string) $grupo->lap_codigo;
+                }
+                $this->programa_id_derived = $grupo->pro_codigo ?? null;
+                // Derive trayecto from grupo's seccion if available
+                if (!empty($grupo->sec_codigo) && !empty($grupo->lap_codigo)) {
+                    try {
+                        $traRow = \Illuminate\Support\Facades\DB::connection($equipos->academicConnection())
+                            ->table('seccion as sec')
+                            ->leftJoin('malla as mal', 'mal.mal_codigo', '=', 'sec.sec_cod_malla')
+                            ->leftJoin('trayecto as tra', 'tra.tra_codigo', '=', 'mal.mal_cod_trayecto')
+                            ->where('sec.sec_codigo', $grupo->sec_codigo)
+                            ->where('sec.sec_cod_lapso_academico', $grupo->lap_codigo)
+                            ->value('tra.tra_nombre');
+                        $this->trayecto_derived = trim((string) ($traRow ?? ''));
+                    } catch (\Throwable) {
+                        $this->trayecto_derived = '';
+                    }
                 }
                 return;
             }
         }
 
-        // Es una sección de intranet o se limpió la selección
+        // Es una sección de intranet (EQSEC:)
         $this->esGrupoRegistrado = false;
         $this->comunidadNombreGrupo = null;
-        $this->titulo = '';
         $this->comunidad_id = '';
 
         $partes = $equipos->parsearClave($clave);
         if ($partes) {
             $this->filterLapsoEquipo = (string) $partes['lap_codigo'];
+        }
+
+        // Consultar datos del equipo para auto-rellenar título y derivar programa/trayecto
+        try {
+            $conn = $equipos->academicConnection();
+            $row = \Illuminate\Support\Facades\DB::connection($conn)
+                ->table('seccion as sec')
+                ->join('lapso_academico as lap', 'lap.lap_codigo', '=', 'sec.sec_cod_lapso_academico')
+                ->leftJoin('malla as mal', 'mal.mal_codigo', '=', 'sec.sec_cod_malla')
+                ->leftJoin('programa as pro', 'pro.pro_codigo', '=', 'mal.mal_cod_programa')
+                ->leftJoin('trayecto as tra', 'tra.tra_codigo', '=', 'mal.mal_cod_trayecto')
+                ->where('sec.sec_codigo', $partes['sec_codigo'])
+                ->where('lap.lap_codigo', $partes['lap_codigo'])
+                ->select(['sec.sec_nombre', 'lap.lap_nombre', 'pro.pro_codigo', 'pro.pro_siglas', 'tra.tra_nombre'])
+                ->first();
+
+            if ($row) {
+                $this->titulo = trim('Sección ' . $row->sec_nombre . ' · ' . $row->lap_nombre);
+                $this->programa_id_derived = $row->pro_codigo ?? null;
+                $this->trayecto_derived = trim($row->tra_nombre ?? '');
+            } else {
+                $this->titulo = 'Sección #' . $partes['sec_codigo'];
+            }
+        } catch (\Throwable) {
+            $this->titulo = 'Sección #' . $partes['sec_codigo'];
         }
     }
 
@@ -453,6 +517,11 @@ class ProyectoManager extends Component
         $this->editingId = null;
         $this->esGrupoRegistrado = false;
         $this->comunidadNombreGrupo = null;
+        $this->showTeamFilters = false;
+        $this->showClassification = false;
+        $this->showAdvanced = false;
+        $this->programa_id_derived = null;
+        $this->trayecto_derived = '';
     }
 
     protected function estadoFormulario(): array
@@ -465,6 +534,8 @@ class ProyectoManager extends Component
             'filterProgramaEquipo' => $this->filterProgramaEquipo,
             'filterSeccionEquipo' => $this->filterSeccionEquipo,
             'equipo_seccion_clave' => $this->equipo_seccion_clave,
+            'programa_id' => $this->programa_id_derived,
+            'trayecto' => $this->trayecto_derived,
             'archivo_actual' => $this->archivo_actual,
             'titulo' => $this->titulo,
             'resumen' => $this->resumen,

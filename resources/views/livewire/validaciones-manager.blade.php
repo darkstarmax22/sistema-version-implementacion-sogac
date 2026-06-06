@@ -96,10 +96,6 @@
                             </td>
                             <td align="center" style="padding: 5px;">
                                 {{ $p->lapso_academico->nombre }}
-                                @if ($p->coordinacion)
-                                    <br><span style="font-size: 10px; font-weight: bold;">Coordinaci&oacute;n:
-                                        {{ $p->coordinacion->nombre }}</span>
-                                @endif
                             </td>
                             <td align="center" style="padding: 5px;">
                                 @if ($p->archivo_path)
@@ -215,12 +211,6 @@
                                     <td><b>Metodolog&iacute;a:</b></td>
                                     <td>{{ $selectedProject->metodologia->nombre }}</td>
                                 </tr>
-                                @if ($selectedProject->coordinacion)
-                                    <tr>
-                                        <td><b>Coordinaci&oacute;n:</b></td>
-                                        <td>{{ $selectedProject->coordinacion->nombre }}</td>
-                                    </tr>
-                                @endif
                                 <tr>
                                     <td><b>L&iacute;nea de Inv.:</b></td>
                                     <td>{{ $selectedProject->linea_investigacion->nombre_investigacion }}</td>

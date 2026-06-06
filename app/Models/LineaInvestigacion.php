@@ -16,13 +16,17 @@ class LineaInvestigacion extends RepositorioModel
         'nombre_investigacion',
         'descripcion',
         'area_de_investigacion',
-        'coordinacion_id',
+        'programa_id',
         'activo',
     ];
 
-    public function getNombreCoordinacionAttribute(): string
+    public function getNombreProgramaAttribute(): string
     {
-        $id = $this->coordinacion_id;
+        if (isset($this->attributes['nombre_programa_cache'])) {
+            return $this->attributes['nombre_programa_cache'];
+        }
+
+        $id = $this->programa_id;
         if (! $id) {
             return 'N/A';
         }

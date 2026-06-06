@@ -12,7 +12,7 @@ class Componente extends RepositorioModel
 
     protected $fillable = [
         'nombre',
-        'coordinacion_id',
+        'programa_id',
         'anio',
         'es_obligatorio',
         'estado_logico',
@@ -26,12 +26,12 @@ class Componente extends RepositorioModel
     /**
      * Guarda múltiples componentes.
      */
-    public static function guardarMuchos(array $rows, string $coordinacion_id, string $anio): void
+    public static function guardarMuchos(array $rows, string $programa_id, string $anio): void
     {
         foreach ($rows as $row) {
             self::create([
                 'nombre' => $row['nombre'],
-                'coordinacion_id' => $coordinacion_id,
+                'programa_id' => $programa_id,
                 'anio' => $anio,
                 'es_obligatorio' => $row['es_obligatorio'],
                 'estado_logico' => true,
@@ -39,9 +39,13 @@ class Componente extends RepositorioModel
         }
     }
 
-    public function getNombreCoordinacionAttribute(): string
+    public function getNombreProgramaAttribute(): string
     {
-        $id = $this->coordinacion_id;
+        if (isset($this->attributes['nombre_programa_cache'])) {
+            return $this->attributes['nombre_programa_cache'];
+        }
+
+        $id = $this->programa_id;
         if (! $id) {
             return 'N/A';
         }

@@ -43,7 +43,6 @@ return [
         'proyecto_documentos',
         'comunidades',
         'comunidad_estudiante',
-        'coordinaciones',
         'linea_investigacions',
         'metodologia_investigacions',
         'tipo_investigacions',

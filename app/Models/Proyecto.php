@@ -28,6 +28,7 @@ class Proyecto extends RepositorioModel
     ];
 
     protected static array $resumenEquipoCache = [];
+    protected static array $grupoNombreCache = [];
 
     public function getTituloAttribute(): string
     {
@@ -36,10 +37,12 @@ class Proyecto extends RepositorioModel
         }
         $partes = app(\App\Services\GrupoProyectoService::class)->parsearClave($this->equipo_ref);
         if ($partes && ($partes['tipo'] ?? '') === \App\Services\GrupoProyectoService::PREFIJO && !empty($partes['grp_codigo'])) {
-            $grupo = \App\Models\GrupoProyectoModulo::find($partes['grp_codigo']);
-            if ($grupo) {
-                return $grupo->grp_nombre;
+            $codigo = $partes['grp_codigo'];
+            if (!isset(self::$grupoNombreCache[$codigo])) {
+                $grupo = \App\Models\GrupoProyectoModulo::find($codigo);
+                self::$grupoNombreCache[$codigo] = $grupo ? $grupo->grp_nombre : null;
             }
+            return self::$grupoNombreCache[$codigo] ?? $this->equipo_ref;
         }
         return $this->equipo_ref;
     }
@@ -83,19 +86,22 @@ class Proyecto extends RepositorioModel
         return $query->activos()->aprobados();
     }
 
-    public function scopeBusquedaPublica(Builder $query, ?string $search = null, ?int $coordinacionId = null, ?string $lapso = null): Builder
+    public function scopeBusquedaPublica(Builder $query, ?string $search = null, ?int $programaId = null, ?string $lapso = null): Builder
     {
-        $query->visiblesPublico()->with(['tipo_publicacion', 'linea_investigacion', 'comunidad']);
-
-        if ($search) {
+        if ($search !== null && $search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('resumen', 'like', '%'.$search.'%');
+                $q->where('equipo_ref', 'like', "%{$search}%");
+                try {
+                    $q->orWhereRaw('MATCH(pry_resumen) AGAINST(? IN BOOLEAN MODE)', [$search . '*']);
+                } catch (\Throwable) {
+                    $q->orWhere('resumen', 'like', "%{$search}%");
+                }
             });
         }
 
-        if ($coordinacionId) {
-            $query->whereHas('linea_investigacion', function ($q) use ($coordinacionId) {
-                $q->where('coordinacion_id', $coordinacionId);
+        if ($programaId) {
+            $query->whereHas('linea_investigacion', function ($q) use ($programaId) {
+                $q->where('programa_id', $programaId);
             });
         }
 
@@ -162,7 +168,11 @@ class Proyecto extends RepositorioModel
             ->where('estado_validacion', 'pendiente');
 
         if ($search) {
-            $query->where('resumen', 'like', '%'.$search.'%');
+            try {
+                $query->whereRaw('MATCH(pry_resumen) AGAINST(? IN BOOLEAN MODE)', [$search . '*']);
+            } catch (\Throwable) {
+                $query->where('resumen', 'like', '%' . $search . '%');
+            }
         }
 
         return $query;

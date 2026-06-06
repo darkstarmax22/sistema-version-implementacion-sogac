@@ -18,18 +18,12 @@ class Equipo extends RepositorioModel
         'anio',
         'seccion',
         'comunidad_id',
-        'coordinacion_id',
         'estado_logico',
     ];
 
     public function comunidad()
     {
         return $this->belongsTo(Comunidad::class);
-    }
-
-    public function coordinacion()
-    {
-        return $this->belongsTo(Coordinacion::class);
     }
 
     public function estudiantes()

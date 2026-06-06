@@ -14,9 +14,9 @@
                 </td>
                 <td width="25%">
                     <b>Filtrar por Coordinaci&oacute;n:</b><br>
-                    <select wire:model.live="filterCoordinacion" style="width: 95%;">
-                        <option value="">Todos los Coordinaci&oacute;n...</option>
-                        @foreach($coordinaciones as $p) <option value="{{ $p->id }}">{{ $p->nombre }}</option> @endforeach
+                    <select wire:model.live="filterPrograma" style="width: 95%;">
+                        <option value="">Todos los programas</option>
+                        @foreach($programas as $p) <option value="{{ $p->id }}">{{ $p->siglas }} - {{ $p->nombre }}</option> @endforeach
                     </select>
                 </td>
                 <td width="25%">
@@ -60,10 +60,6 @@
                             {{ Str::limit($p->resumen, 200) }}
                         </td>
                         <td align="center" style="padding: 10px;">
-                            <span style="background-color: #FFFF00; border: 1px solid #CCC; padding: 2px 4px; font-size: 9px; font-weight: bold; color: #000; display: inline-block; margin-bottom: 5px;">
-                                {{ $p->coordinacion->nombre }}
-                            </span>
-                            <br>
                             <span style="font-size: 10px; font-weight: bold;">Lapso: {{ $p->lapso_academico->nombre ?? 'N/A' }}</span>
                         </td>
                         <td align="center" style="padding: 10px;">

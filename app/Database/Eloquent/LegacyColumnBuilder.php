@@ -50,4 +50,22 @@ class LegacyColumnBuilder extends Builder
     {
         return $this->orderBy($column, 'asc');
     }
+
+    public function latest($column = null)
+    {
+        if (is_null($column)) {
+            $column = $this->model->getCreatedAtColumn();
+        }
+
+        return $this->orderBy($column, 'desc');
+    }
+
+    public function oldest($column = null)
+    {
+        if (is_null($column)) {
+            $column = $this->model->getCreatedAtColumn();
+        }
+
+        return $this->orderBy($column, 'asc');
+    }
 }

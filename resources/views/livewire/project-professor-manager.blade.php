@@ -89,11 +89,6 @@
                         $cedula = $doc->cedula;
                         $habilitado = $doc->habilitado_modulo;
                         $canRevoke = true;
-                        if ($habilitado && $doc->ppm_coordinacion_id && !auth()->user()->hasRole('administrador')) {
-                            if ($activeAdminCoordinacion != $doc->ppm_coordinacion_id) {
-                                $canRevoke = false;
-                            }
-                        }
                     @endphp
                     <tr style="background-color: {{ $loop->iteration % 2 == 0 ? '#E0E0E0' : '#FFFFFF' }};" valign="top">
                         <td style="padding: 5px;">
@@ -142,24 +137,17 @@
                             @else
                                 <span style="font-weight: bold; color: #8b0000;">{{ mb_strtoupper($doc->ppm_anio ?? '-') }}</span><br>
                                 Sec: {{ mb_strtoupper($doc->ppm_seccion ?? '-') }}
-                                @if($doc->ppm_coordinacion_id)
-                                    <br><span style="font-size: 9px; color: #666;">Coord: {{ $professorService->nombreCoordinacion($doc->ppm_coordinacion_id) ?? 'N/A' }}</span>
-                                @endif
                             @endif
                         </td>
                         <td align="center" style="padding: 5px;">
-                            @if(!$habilitado || $canRevoke)
-                                <button type="button"
-                                    wire:click="toggleProjectProfessor('{{ $cedula }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="toggleProjectProfessor"
-                                    class="ppm-btn-action {{ $habilitado ? 'ppm-btn-action--disable' : 'ppm-btn-action--enable' }}">
-                                    <span wire:loading.remove wire:target="toggleProjectProfessor">{{ $habilitado ? 'Deshabilitar' : 'Habilitar' }}</span>
-                                    <span wire:loading wire:target="toggleProjectProfessor">...</span>
-                                </button>
-                            @else
-                                <span style="font-size: 9px; color: #888;">Otra coordinación</span>
-                            @endif
+                            <button type="button"
+                                wire:click="toggleProjectProfessor('{{ $cedula }}')"
+                                wire:loading.attr="disabled"
+                                wire:target="toggleProjectProfessor"
+                                class="ppm-btn-action {{ $habilitado ? 'ppm-btn-action--disable' : 'ppm-btn-action--enable' }}">
+                                <span wire:loading.remove wire:target="toggleProjectProfessor">{{ $habilitado ? 'Deshabilitar' : 'Habilitar' }}</span>
+                                <span wire:loading wire:target="toggleProjectProfessor">...</span>
+                            </button>
                         </td>
                     </tr>
                 @endforeach

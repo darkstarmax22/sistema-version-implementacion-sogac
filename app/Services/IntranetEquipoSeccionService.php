@@ -180,6 +180,7 @@ class IntranetEquipoSeccionService
                     'lap.lap_nombre',
                     'pro.pro_siglas',
                     'pro.pro_nombre',
+                    'pro.pro_codigo',
                 ])
                 ->addSelect('tra.tra_nombre');
 
@@ -387,14 +388,28 @@ class IntranetEquipoSeccionService
 
     public function programasEnLapso(?int $lapCodigo): Collection
     {
-        $cacheKey = 'equipos_todos_programas_'.DbHelper::connection();
+        $conn = $this->academicConnection();
+        $cacheKey = 'equipos_programas_lapso_v2_'.($lapCodigo ?? '0').'_'.$conn;
 
-        return Cache::remember($cacheKey, now()->addMinutes(30), function () {
+        return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($lapCodigo, $conn) {
             try {
-                return DB::connection($this->academicConnection())
-                    ->table('programa')
-                    ->select(['pro_codigo', 'pro_siglas', 'pro_nombre'])
-                    ->orderBy('pro_siglas')
+                if ($lapCodigo === null) {
+                    return DB::connection($conn)
+                        ->table('programa')
+                        ->select(['pro_codigo', 'pro_siglas', 'pro_nombre'])
+                        ->orderBy('pro_siglas')
+                        ->get();
+                }
+
+                return DB::connection($conn)
+                    ->table('seccion as sec')
+                    ->leftJoin('malla as mal', 'mal.mal_codigo', '=', 'sec.sec_cod_malla')
+                    ->leftJoin('programa as pro', 'pro.pro_codigo', '=', 'mal.mal_cod_programa')
+                    ->where('sec.sec_cod_lapso_academico', $lapCodigo)
+                    ->whereNotNull('pro.pro_codigo')
+                    ->select(['pro.pro_codigo', 'pro.pro_siglas', 'pro.pro_nombre'])
+                    ->distinct()
+                    ->orderBy('pro.pro_siglas')
                     ->get();
             } catch (\Throwable) {
                 return collect();
@@ -408,7 +423,7 @@ class IntranetEquipoSeccionService
             return collect();
         }
 
-        $cacheKey = 'equipos_secciones_'.$lapCodigo.'_'.($programaCodigo ?? '0').'_'.DbHelper::connection();
+        $cacheKey = 'equipos_secciones_v2_'.$lapCodigo.'_'.($programaCodigo ?? '0').'_'.DbHelper::connection();
 
         return Cache::remember($cacheKey, now()->addMinutes(30), function () use ($lapCodigo, $programaCodigo) {
             try {
@@ -556,6 +571,7 @@ class IntranetEquipoSeccionService
             'sec_nombre' => trim($row->sec_nombre),
             'lap_codigo' => $lap,
             'lapso_nombre' => trim($row->lap_nombre ?? ''),
+            'pro_codigo' => (int) ($row->pro_codigo ?? 0),
             'programa_siglas' => trim($row->pro_siglas ?? ''),
             'trayecto_nombre' => trim($row->trayecto_nombre ?? ''),
             'integrantes' => (int) ($row->integrantes ?? 0),

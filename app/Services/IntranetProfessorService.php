@@ -196,7 +196,7 @@ class IntranetProfessorService
     }
 
     /**
-     * @param  array{anio?: string, seccion?: string, coordinacion_id?: int|null, sud_codigo?: int|null}  $datos
+     * @param  array{anio?: string, seccion?: string, sud_codigo?: int|null}  $datos
      */
     public function habilitarEnModulo(string $cedula, int $lapCodigo, array $datos): bool
     {
@@ -215,7 +215,6 @@ class IntranetProfessorService
             'ppm_sud_codigo' => $datos['sud_codigo'] ?? null,
             'ppm_anio' => $datos['anio'] ?? null,
             'ppm_seccion' => $datos['seccion'] ?? null,
-            'ppm_coordinacion_id' => $datos['coordinacion_id'] ?? null,
             'ppm_habilitado' => true,
             'updated_at' => now(),
         ];
@@ -276,14 +275,14 @@ class IntranetProfessorService
         int $page = 1,
     ): LengthAwarePaginator {
         try {
-            $countQuery = $this->baseProfesorProyectoQuery($lapCodigo, $filtros)
+            $intranetQuery = $this->baseProfesorProyectoQuery($lapCodigo, $filtros)
                 ->leftJoin('persona as p', 'p.per_cedula', '=', 'sud.sud_ced_docente')
                 ->select('sud.sud_ced_docente')
                 ->groupBy('sud.sud_ced_docente');
 
             if ($search !== '') {
                 $term = '%' . $search . '%';
-                $countQuery->where(function($q) use ($term) {
+                $intranetQuery->where(function($q) use ($term) {
                     $q->where('sud.sud_ced_docente', 'LIKE', $term)
                       ->orWhere('p.per_nombres', 'LIKE', $term)
                       ->orWhere('p.per_apellidos', 'LIKE', $term)
@@ -296,42 +295,117 @@ class IntranetProfessorService
                 });
             }
 
-            $total = $countQuery->get()->count();
+            $intranetCedulas = $intranetQuery
+                ->pluck('sud.sud_ced_docente')
+                ->map(fn ($v) => trim($v))
+                ->unique()
+                ->values()
+                ->all();
+
+            $moduleCedulas = [];
+            if ($this->moduloTableExists() && $lapCodigo !== null) {
+                $modQuery = DB::connection($this->repositorioConnection())
+                    ->table('profesor_proyecto_modulo')
+                    ->where('ppm_habilitado', true)
+                    ->where('ppm_lap_codigo', $lapCodigo)
+                    ->select('ppm_cedula');
+
+                if ($search !== '') {
+                    $modQuery->where('ppm_cedula', 'LIKE', '%' . $search . '%');
+                }
+
+                $moduleCedulas = $modQuery
+                    ->pluck('ppm_cedula')
+                    ->map(fn ($v) => trim($v))
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+
+            $allCedulas = array_values(array_unique(array_merge($intranetCedulas, $moduleCedulas)));
+            sort($allCedulas);
+
+            $total = count($allCedulas);
 
             if ($total === 0) {
                 return new LengthAwarePaginator([], 0, $perPage, $page, ['path' => request()->url(), 'query' => request()->query()]);
             }
 
-            $cedulasPage = $countQuery
-                ->orderBy('sud.sud_ced_docente')
-                ->skip(($page - 1) * $perPage)
-                ->take($perPage)
-                ->pluck('sud.sud_ced_docente');
+            $pageCedulas = array_slice($allCedulas, ($page - 1) * $perPage, $perPage);
 
-            $rows = $this->baseProfesorProyectoQuery($lapCodigo, $filtros)
-                ->leftJoin('persona as p', 'p.per_cedula', '=', 'sud.sud_ced_docente')
-                ->whereIn('sud.sud_ced_docente', $cedulasPage)
-                ->select([
-                    'sud.sud_codigo',
-                    'sud.sud_cod_seccion',
-                    'sec.sec_codigo',
-                    'sec.sec_nombre',
-                    'lap.lap_codigo',
-                    'lap.lap_nombre',
-                    'ucu.ucu_siglas',
-                    'ucu.ucu_nombre',
-                    'pro.pro_siglas',
-                    'pro.pro_nombre',
-                    'tra.tra_nombre',
-                ])
-                ->selectRaw('sud.sud_ced_docente as cedula')
-                ->selectRaw('p.per_nombres as per_nombres')
-                ->selectRaw('p.per_apellidos as per_apellidos')
-                ->orderBy('sud.sud_ced_docente')
-                ->orderBy('pro.pro_siglas')
-                ->orderBy('tra.tra_nombre')
-                ->orderBy('sec.sec_nombre')
-                ->get();
+            $rows = collect();
+            $pageIntranetCedulas = array_intersect($pageCedulas, $intranetCedulas);
+
+            if ($pageIntranetCedulas !== []) {
+                $rows = $this->baseProfesorProyectoQuery($lapCodigo, $filtros)
+                    ->leftJoin('persona as p', 'p.per_cedula', '=', 'sud.sud_ced_docente')
+                    ->whereIn('sud.sud_ced_docente', $pageIntranetCedulas)
+                    ->select([
+                        'sud.sud_codigo',
+                        'sud.sud_cod_seccion',
+                        'sec.sec_codigo',
+                        'sec.sec_nombre',
+                        'lap.lap_codigo',
+                        'lap.lap_nombre',
+                        'ucu.ucu_siglas',
+                        'ucu.ucu_nombre',
+                        'pro.pro_siglas',
+                        'pro.pro_nombre',
+                        'tra.tra_nombre',
+                    ])
+                    ->selectRaw('sud.sud_ced_docente as cedula')
+                    ->selectRaw('p.per_nombres as per_nombres')
+                    ->selectRaw('p.per_apellidos as per_apellidos')
+                    ->orderBy('sud.sud_ced_docente')
+                    ->orderBy('pro.pro_siglas')
+                    ->orderBy('tra.tra_nombre')
+                    ->orderBy('sec.sec_nombre')
+                    ->get();
+            }
+
+            $moduleOnlyCedulas = array_diff($pageCedulas, $intranetCedulas);
+            $moduleOnlyRows = collect();
+
+            if ($moduleOnlyCedulas !== []) {
+                try {
+                    $personas = DB::connection($this->academicConnection())
+                        ->table('persona')
+                        ->whereIn('per_cedula', $moduleOnlyCedulas)
+                        ->select(['per_cedula', 'per_nombres', 'per_apellidos'])
+                        ->get()
+                        ->keyBy('per_cedula');
+
+                    $lapso = DB::connection($this->academicConnection())
+                        ->table('lapso_academico')
+                        ->where('lap_codigo', $lapCodigo)
+                        ->select(['lap_codigo', 'lap_nombre'])
+                        ->first();
+
+                    foreach ($moduleOnlyCedulas as $ced) {
+                        $p = $personas->get($ced);
+                        $moduleOnlyRows->push((object) [
+                            'sud_codigo' => null,
+                            'sud_cod_seccion' => null,
+                            'sec_codigo' => null,
+                            'sec_nombre' => null,
+                            'lap_codigo' => $lapCodigo,
+                            'lap_nombre' => $lapso->lap_nombre ?? 'N/A',
+                            'ucu_siglas' => null,
+                            'ucu_nombre' => null,
+                            'pro_siglas' => null,
+                            'pro_nombre' => null,
+                            'tra_nombre' => null,
+                            'cedula' => $ced,
+                            'per_nombres' => $p->per_nombres ?? 'Docente',
+                            'per_apellidos' => $p->per_apellidos ?? '',
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error("Error fetching module-only professor data: " . $e->getMessage());
+                }
+            }
+
+            $rows = $rows->concat($moduleOnlyRows)->sortBy('cedula')->values();
 
             if (DbHelper::isUsingIntranet()) {
                 app(IntranetSimulationMirrorService::class)->mirrorRows('seccion_unidad_docente', $rows);
@@ -341,7 +415,7 @@ class IntranetProfessorService
             return new LengthAwarePaginator([], 0, $perPage, $page, ['path' => request()->url(), 'query' => request()->query()]);
         }
 
-        $grouped = $this->agruparPorCedula($rows, '');
+        $grouped = $this->agruparPorCedula($rows, $search);
         $items = $grouped->values();
 
         return new LengthAwarePaginator(
@@ -694,7 +768,6 @@ class IntranetProfessorService
                     'habilitado_modulo' => $cfg ? (bool) $cfg->ppm_habilitado : false,
                     'ppm_anio' => $cfg->ppm_anio ?? null,
                     'ppm_seccion' => $cfg->ppm_seccion ?? null,
-                    'ppm_coordinacion_id' => $cfg->ppm_coordinacion_id ?? null,
                     'sud_codigo' => $cfg->ppm_sud_codigo ?? $primera->sud_codigo,
                 ];
             })
@@ -815,7 +888,7 @@ class IntranetProfessorService
 
     /**
      * @param  array{programa?: int|null, trayecto?: int|null, seccion?: int|null}  $filtrosIntranet
-     * @param  array{anio?: string, seccion?: string, coordinacion_id?: int|null}  $habilitarDatos
+     * @param  array{anio?: string, seccion?: string}  $habilitarDatos
      * @return array{ok: bool, flash: string, message: string}
      */
     public function alternarHabilitacionModulo(
@@ -823,8 +896,6 @@ class IntranetProfessorService
         int $lapCodigo,
         array $filtrosIntranet,
         array $habilitarDatos,
-        ?int $activeAdminCoordinacion,
-        bool $esAdministrador,
     ): array {
         $cedula = trim($cedula);
 
@@ -837,13 +908,6 @@ class IntranetProfessorService
         }
 
         if ($this->habilitadoEnModulo($cedula, $lapCodigo)) {
-            $cfg = $this->configuracionModulo($cedula, $lapCodigo);
-            if ($cfg && ($cfg['ppm_coordinacion_id'] ?? null) && ! $esAdministrador) {
-                if ($activeAdminCoordinacion != $cfg['ppm_coordinacion_id']) {
-                    return ['ok' => false, 'flash' => 'message_error', 'message' => 'Acceso denegado: este profesor pertenece a otra coordinación.'];
-                }
-            }
-
             $this->deshabilitarEnModulo($cedula, $lapCodigo);
 
             return ['ok' => true, 'flash' => 'message', 'message' => 'Profesor de proyecto deshabilitado en el módulo.', 'deshabilitado' => true];
@@ -860,20 +924,9 @@ class IntranetProfessorService
         $this->habilitarEnModulo($cedula, $lapCodigo, [
             'anio' => $habilitarDatos['anio'],
             'seccion' => $habilitarDatos['seccion'],
-            'coordinacion_id' => $habilitarDatos['coordinacion_id'] ?? null,
         ]);
 
         return ['ok' => true, 'flash' => 'message', 'message' => 'Profesor habilitado como evaluador de proyecto en este lapso.', 'deshabilitado' => false];
     }
 
-    public function nombreCoordinacion(?int $coordinacionId): ?string
-    {
-        if (! $coordinacionId) {
-            return null;
-        }
-
-        $coord = \App\Models\Coordinacion::find($coordinacionId);
-
-        return $coord?->nombre;
-    }
 }

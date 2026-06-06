@@ -3,8 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Proyecto;
-use App\Models\Coordinacion;
-use App\Services\ModuloRepositorioService;
+use App\Services\AcademicCatalog;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -13,7 +12,7 @@ class RepositorioPublico extends Component
     use WithPagination;
 
     public $search = '';
-    public $filterCoordinacion = '';
+    public $filterPrograma = '';
     public $filterLapso = '';
 
     public function with()
@@ -21,13 +20,10 @@ class RepositorioPublico extends Component
         return [
             'proyectos' => Proyecto::busquedaPublica(
                 $this->search,
-                (int) $this->filterCoordinacion ?: null,
+                (int) $this->filterPrograma ?: null,
                 $this->filterLapso
             )->latest()->paginate(9),
-            'coordinaciones' => app(ModuloRepositorioService::class)
-                ->queryModel(Coordinacion::class)
-                ->orderBy('nombre')
-                ->get(),
+            'programas' => app(AcademicCatalog::class)->programasForSelect(),
         ];
     }
 

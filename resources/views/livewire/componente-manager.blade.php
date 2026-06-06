@@ -118,7 +118,7 @@
                             <td align="center" style="font-weight: bold; padding: 8px;">
                                 {{ mb_strtoupper($item->nombre) }}</td>
                             <td align="center" style="font-weight: bold; font-style: italic; padding: 8px;">
-                                {{ $item->nombre_coordinacion }} <br>
+                                {{ $item->nombre_programa }} <br>
                                 <span style="color: #8b0000;">Trayecto/A&ntilde;o: {{ mb_strtoupper($item->anio) }}</span>
                             </td>
                             <td align="center">
@@ -177,7 +177,7 @@
                         <td width="30%"><b>Programa Titular:</b></td>
                         <td width="70%">
                             @if (auth()->user()->hasRole('administrador'))
-                                <select wire:model.live="coordinacion_id" style="width: 80%; padding: 4px;">
+                                <select wire:model.live="programa_id" style="width: 80%; padding: 4px;">
                                     <option value="">Seleccione a qui&eacute;n pertenece esta regla...</option>
                                     @foreach ($programas as $p)
                                         <option value="{{ $p->id }}">{{ $p->siglas }} -
@@ -187,10 +187,10 @@
                             @else
                                 <div
                                     style="padding: 4px 8px; background-color: #f5f5f5; border: 1px solid #ddd; width: 80%; font-weight:bold; color: #555;">
-                                    {{ \App\Models\Coordinacion::find($coordinacion_id)?->nombre ?? '[COORDINACI&Oacute;N AUTOASIGNADA]' }}
+                                    {{ collect($programas)->firstWhere('id', $programa_id)?->nombre ?? '[COORDINACI&Oacute;N AUTOASIGNADA]' }}
                                 </div>
                             @endif
-                            @error('coordinacion_id')
+                            @error('programa_id')
                                 <br><span style="color:red; font-size:10px;">{{ $message }}</span>
                             @enderror
                         </td>
@@ -200,9 +200,13 @@
                         <td width="70%">
                             <select wire:model="anio" style="width: 30%; padding: 4px;">
                                 <option value="">Seleccione trayecto...</option>
-                                @foreach ($trayectosPrograma as $t)
+                                @forelse ($trayectosPrograma as $t)
                                     <option value="{{ $t->tra_nombre }}">{{ $t->tra_nombre }}</option>
-                                @endforeach
+                                @empty
+                                    @foreach (['I', 'II', 'III', 'IV', 'V', 'VI'] as $t)
+                                        <option value="{{ $t }}">{{ $t }}</option>
+                                    @endforeach
+                                @endforelse
                             </select>
                             @error('anio')
                                 <br><span style="color:red; font-size:10px;">{{ $message }}</span>

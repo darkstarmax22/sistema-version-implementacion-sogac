@@ -101,8 +101,8 @@
                             <td align="center" style="padding: 5px;">
                                 {{ $item->area_de_investigacion }}
                                 <br>
-                                <span style="font-size: 10px; font-weight: bold;">Coordinación:
-                                    {{ $item->nombre_coordinacion }}</span>
+                                <span style="font-size: 10px; font-weight: bold;">Programa:
+                                    {{ $item->nombre_programa }}</span>
                             </td>
                             <td align="center">
                                 @if ($item->activo)
@@ -172,7 +172,7 @@
                     <tr>
                         <td width="30%"><b>Seleccionar Programa:</b></td>
                         <td width="70%">
-                            <select wire:model="coordinacion_id" style="width: 90%; padding: 2px;">
+                            <select wire:model="programa_id" style="width: 90%; padding: 2px;">
                                 <option value="">Seleccione un Programa...</option>
                                 @foreach ($programas as $p)
                                     <option value="{{ $p->id }}">{{ $p->siglas }} - {{ $p->nombre }}
@@ -180,7 +180,7 @@
                                 @endforeach
                             </select>
                             <span class="obligatorio">*</span>
-                            @error('coordinacion_id')
+                            @error('programa_id')
                                 <br><span class="obligatorio" style="font-size: 11px;">{{ $message }}</span>
                             @enderror
                         </td>

@@ -1,121 +1,120 @@
-<style>
-    .grp-btn {
-        border: 1px solid #777;
-        background: #fff;
-        color: #222;
-        padding: 0.65rem 1rem;
-        border-radius: 0.45rem;
-        font-size: 0.92rem;
-        cursor: pointer;
-        transition: all 0.18s ease;
-        min-width: 120px;
-    }
-
-    .grp-btn:hover {
-        background: #f3f3f3;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-    }
-
-    .grp-btn-primary {
-        background: #198754;
-        color: #fff;
-        border-color: #166f43;
-    }
-
-    .grp-btn-primary:hover {
-        background: #146c43;
-    }
-
-    .grp-btn-secondary {
-        background: #fafafa;
-        color: #1f2937;
-        border-color: #d1d5db;
-    }
-
-    .grp-btn-danger {
-        background: #fee2e2;
-        color: #991b1b;
-        border-color: #fca5a5;
-    }
-
-    .grp-btn-small {
-        font-size: 0.82rem;
-        padding: 0.45rem 0.75rem;
-        min-width: auto;
-    }
-
-    .cm-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 6px;
-        padding: 0.55rem 0.95rem;
-        font-size: 0.92rem;
-        font-weight: 600;
-        border: 1px solid transparent;
-        cursor: pointer;
-        transition: background-color 0.2s ease, transform 0.2s ease;
-        text-decoration: none;
-    }
-
-    .cm-btn:hover {
-        transform: translateY(-1px);
-    }
-
-    .cm-btn-primary {
-        background: #19692e;
-        border-color: #154f26;
-        color: #fff;
-    }
-
-    .cm-btn-success {
-        background: #198754;
-        border-color: #166f43;
-        color: #fff;
-    }
-
-    .cm-btn-warning {
-        background: #f0b606;
-        border-color: #d99e00;
-        color: #212529;
-    }
-
-    .cm-btn-danger {
-        background: #c82333;
-        border-color: #a71d2a;
-        color: #fff;
-    }
-
-    .cm-btn-secondary {
-        background: #f4f4f4;
-        border-color: #c2c2c2;
-        color: #222;
-    }
-
-    .cm-btn-sm {
-        padding: 0.35rem 0.75rem;
-        font-size: 0.85rem;
-    }
-
-    .grp-filter-select, .grp-filter-input {
-        height: 32px;
-        padding: 4px 8px;
-        font-size: 12px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        background: #fff;
-        box-sizing: border-box;
-    }
-    .grp-filter-select {
-        min-width: 140px;
-    }
-    .grp-filter-input {
-        width: 160px;
-    }
-</style>
-
 <div>
+    <style>
+        .grp-btn {
+            border: 1px solid #777;
+            background: #fff;
+            color: #222;
+            padding: 0.65rem 1rem;
+            border-radius: 0.45rem;
+            font-size: 0.92rem;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            min-width: 120px;
+        }
+
+        .grp-btn:hover {
+            background: #f3f3f3;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .grp-btn-primary {
+            background: #198754;
+            color: #fff;
+            border-color: #166f43;
+        }
+
+        .grp-btn-primary:hover {
+            background: #146c43;
+        }
+
+        .grp-btn-secondary {
+            background: #fafafa;
+            color: #1f2937;
+            border-color: #d1d5db;
+        }
+
+        .grp-btn-danger {
+            background: #fee2e2;
+            color: #991b1b;
+            border-color: #fca5a5;
+        }
+
+        .grp-btn-small {
+            font-size: 0.82rem;
+            padding: 0.45rem 0.75rem;
+            min-width: auto;
+        }
+
+        .cm-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            padding: 0.55rem 0.95rem;
+            font-size: 0.92rem;
+            font-weight: 600;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            text-decoration: none;
+        }
+
+        .cm-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .cm-btn-primary {
+            background: #19692e;
+            border-color: #154f26;
+            color: #fff;
+        }
+
+        .cm-btn-success {
+            background: #198754;
+            border-color: #166f43;
+            color: #fff;
+        }
+
+        .cm-btn-warning {
+            background: #f0b606;
+            border-color: #d99e00;
+            color: #212529;
+        }
+
+        .cm-btn-danger {
+            background: #c82333;
+            border-color: #a71d2a;
+            color: #fff;
+        }
+
+        .cm-btn-secondary {
+            background: #f4f4f4;
+            border-color: #c2c2c2;
+            color: #222;
+        }
+
+        .cm-btn-sm {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        .grp-filter-select, .grp-filter-input {
+            height: 32px;
+            padding: 4px 8px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #fff;
+            box-sizing: border-box;
+        }
+        .grp-filter-select {
+            min-width: 140px;
+        }
+        .grp-filter-input {
+            width: 160px;
+        }
+    </style>
     <h2 class="titulo" style="margin-bottom: 10px; font-weight: bolder;">Equipos de proyecto</h2>
 
     <p style="font-size: 11px; color: #444; margin-bottom: 12px;">

@@ -50,7 +50,7 @@ class ComunidadGestionService
             'numero_telefono' => $comunidad->numero_telefono,
             'estado_id' => $direccion?->municipio?->est_codigo ? (string) $direccion->municipio->est_codigo : '',
             'municipio_id' => $direccion?->mun_codigo ? (string) $direccion->mun_codigo : '',
-            'dir_nombre' => $direccion?->dir_nombre ?? '',
+            'dir_nombre' => $direccion?->dir_calle ?? '',
             'contactos' => $comunidad->contactos->map(fn ($c) => [
                 'nombre' => $c->ccon_nombre,
                 'apellido' => $c->ccon_apellido ?? '',
@@ -58,7 +58,8 @@ class ComunidadGestionService
                 'correo_confirmacion' => $c->ccon_correo ?? '',
                 'prefijo' => $c->ccon_telefono ? (strlen(trim($c->ccon_telefono)) >= 10 ? substr(trim($c->ccon_telefono), 0, 4) : '0424') : '0424',
                 'telefono' => $c->ccon_telefono ? (strlen(trim($c->ccon_telefono)) >= 7 ? substr(trim($c->ccon_telefono), -7) : trim($c->ccon_telefono)) : '',
-                'cargo' => array_key_exists($c->ccon_cargo ?? '', config('comunidades.cargos_contacto', [])) ? ($c->ccon_cargo ?? '') : '__otro__',
+                'cargo' => array_key_exists($c->ccon_cargo ?? '', config('comunidades.cargos_contacto', [])) ? ($c->ccon_cargo ?? '') : ($c->ccon_cargo ?? ''),
+                'mostrar_input_cargo' => !array_key_exists($c->ccon_cargo ?? '', config('comunidades.cargos_contacto', [])),
                 'cargo_custom' => array_key_exists($c->ccon_cargo ?? '', config('comunidades.cargos_contacto', [])) ? '' : ($c->ccon_cargo ?? ''),
             ])->toArray(),
         ];
@@ -72,9 +73,8 @@ class ComunidadGestionService
         $dirNombre = trim($datos['dir_nombre'] ?? '');
 
         if ($dirNombre !== '' && !empty($datos['municipio_id'])) {
-            $direccion = Direccion::updateOrCreate(
-                ['dir_nombre' => $dirNombre, 'mun_codigo' => $datos['municipio_id']],
-                ['dir_nombre' => $dirNombre, 'mun_codigo' => $datos['municipio_id']]
+            $direccion = Direccion::firstOrCreate(
+                ['dir_calle' => $dirNombre, 'mun_codigo' => $datos['municipio_id']]
             );
             $direccionId = $direccion->dir_codigo;
         } else {
@@ -95,20 +95,24 @@ class ComunidadGestionService
 
         if (isset($datos['contactos'])) {
             $comunidad->contactos()->delete();
+            $rows = [];
             foreach ($datos['contactos'] as $contacto) {
-                $telefono = '';
                 $prefijo = $contacto['prefijo'] ?? '';
                 $numero = $contacto['telefono'] ?? '';
-                if ($numero !== '') {
-                    $telefono = $prefijo !== '' ? $prefijo . $numero : $numero;
-                }
-                $comunidad->contactos()->create([
+                $telefono = $numero !== '' ? ($prefijo !== '' ? $prefijo . $numero : $numero) : '';
+                $rows[] = [
+                    'ccom_codigo' => $comunidad->getKey(),
                     'ccon_nombre' => $contacto['nombre'],
                     'ccon_apellido' => $contacto['apellido'] ?? null,
                     'ccon_correo' => $contacto['correo'] ?? null,
                     'ccon_telefono' => $telefono,
                     'ccon_cargo' => $contacto['cargo'] ?? null,
-                ]);
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+            if ($rows) {
+                $comunidad->contactos()->insert($rows);
             }
         }
     }

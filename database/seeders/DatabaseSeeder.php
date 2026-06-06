@@ -65,9 +65,6 @@ class DatabaseSeeder extends Seeder
         ]);
         $estu->roles()->attach(5); // estudiante
 
-        \App\Models\Coordinacion::create(['nombre' => 'Informática', 'descripcion' => 'Programa Nacional de Formación en Informática']);
-        \App\Models\Coordinacion::create(['nombre' => 'Agroalimentación', 'descripcion' => 'Programa Nacional de Formación en Agroalimentación']);
-
         \App\Models\Comunidad::create(['nombre' => 'Comunidad Las Brisas']);
         \App\Models\Comunidad::create(['nombre' => 'Comunidad El Centro']);
     }

@@ -84,10 +84,6 @@ $nav = app(\App\Support\NavigationMenu::class)->flags(auth()->user());
                     <a href="{{ route('profesores-proyecto.index') }}"
                         class="{{ request()->routeIs('profesores-proyecto.index') ? 'active-sub' : '' }}">Profesores
                         de proyecto</a>
-                    @if ($nav['canManageCoordinators'])
-                    <a href="{{ route('coordinadores.index') }}"
-                        class="{{ request()->routeIs('coordinadores.index') ? 'active-sub' : '' }}">Coordinadores</a>
-                    @endif
                 </div>
             </li>
             @endif

@@ -10,7 +10,6 @@ use App\Models\TipoInvestigacion;
 use App\Models\TipoPublicacion;
 use App\Models\User;
 use App\Models\Componente;
-use App\Models\Coordinacion;
 use App\Models\LapsoAcademico;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -80,7 +79,16 @@ class ProyectoGestionService
 
         $query = Proyecto::with($this->relacionesProyecto())
             ->where('estado_validacion', 'pendiente')
-            ->where('resumen', 'like', '%'.$search.'%');
+            ->where(function ($q) use ($search) {
+                if ($search === '') {
+                    return;
+                }
+                try {
+                    $q->whereRaw('MATCH(pry_resumen) AGAINST(? IN BOOLEAN MODE)', [$search . '*']);
+                } catch (\Throwable) {
+                    $q->where('resumen', 'like', '%' . $search . '%');
+                }
+            });
 
         if ($clavesDocente !== null) {
             $query->whereIn('pry_direccion_logica', $clavesDocente);
@@ -153,7 +161,7 @@ class ProyectoGestionService
 
         if ($this->usaComponentesDocumentales()) {
             $datos['componentes_requeridos'] = $this->componentesRequeridos(
-                $estado['coordinacion_id'] ?? null,
+                $estado['programa_id'] ?? null,
                 $estado['trayecto'] ?? ''
             );
         } else {
@@ -222,6 +230,26 @@ class ProyectoGestionService
 
         $partes = $this->equipoSeccion->parsearClave($item->equipo_ref);
 
+        $programaDerived = null;
+        $trayectoDerived = '';
+        if ($partes) {
+            try {
+                $row = \Illuminate\Support\Facades\DB::connection($this->equipoSeccion->academicConnection())
+                    ->table('seccion as sec')
+                    ->leftJoin('malla as mal', 'mal.mal_codigo', '=', 'sec.sec_cod_malla')
+                    ->leftJoin('programa as pro', 'pro.pro_codigo', '=', 'mal.mal_cod_programa')
+                    ->leftJoin('trayecto as tra', 'tra.tra_codigo', '=', 'mal.mal_cod_trayecto')
+                    ->where('sec.sec_codigo', $partes['sec_codigo'])
+                    ->select(['pro.pro_codigo', 'tra.tra_nombre'])
+                    ->first();
+                if ($row) {
+                    $programaDerived = $row->pro_codigo ?? null;
+                    $trayectoDerived = trim($row->tra_nombre ?? '');
+                }
+            } catch (\Throwable) {
+            }
+        }
+
         return [
             'editingId' => $id,
             'titulo' => $item->titulo,
@@ -237,6 +265,8 @@ class ProyectoGestionService
             'comunidad_id' => (string) $item->comunidad_id,
             'equipo_seccion_clave' => $item->equipo_ref ?? '',
             'filterLapsoEquipo' => $partes ? (string) $partes['lap_codigo'] : '',
+            'programa_id_derived' => $programaDerived,
+            'trayecto_derived' => $trayectoDerived,
             'archivos_actuales' => $archivos,
             'archivo_actual' => $item->archivo_path ?? '',
         ];
@@ -289,7 +319,7 @@ class ProyectoGestionService
         }
 
         if ($this->usaComponentesDocumentales()) {
-            $componentes = $this->componentesRequeridos($datos['coordinacion_id'] ?? null, $datos['trayecto'] ?? '');
+            $componentes = $this->componentesRequeridos($datos['programa_id'] ?? null, $datos['trayecto'] ?? '');
             $documentos = [];
 
             if ($editingId && ! empty($archivosActuales)) {
@@ -318,7 +348,7 @@ class ProyectoGestionService
             }
 
             if (! empty($documentos)) {
-                $payload['documentos'] = array_values($documentos);
+                $proyecto->update(['documentos' => array_values($documentos)]);
             }
         }
 
@@ -407,7 +437,7 @@ class ProyectoGestionService
         }
 
         if ($this->usaComponentesDocumentales()) {
-            $componentes = $this->componentesRequeridos($estado['coordinacion_id'] ?? null, $estado['trayecto'] ?? '');
+            $componentes = $this->componentesRequeridos($estado['programa_id'] ?? null, $estado['trayecto'] ?? '');
             foreach ($componentes as $c) {
                 if ($c->es_obligatorio && ! isset($archivosActuales[$c->id])) {
                     $rules['archivos_componentes.'.$c->id] = 'required|file|max:20480';
@@ -426,20 +456,27 @@ class ProyectoGestionService
     public function paginarProyectos(array $filtros, int $page): LengthAwarePaginator
     {
         return Proyecto::with($this->relacionesProyecto())
-            ->when(($filtros['search'] ?? '') !== '', fn ($q) => $q->where('resumen', 'like', '%'.$filtros['search'].'%'))
+            ->when(($filtros['search'] ?? '') !== '', function ($q) use ($filtros) {
+                $s = $filtros['search'];
+                try {
+                    $q->whereRaw('MATCH(pry_resumen) AGAINST(? IN BOOLEAN MODE)', [$s . '*']);
+                } catch (\Throwable) {
+                    $q->where('resumen', 'like', '%' . $s . '%');
+                }
+            })
             ->when(($filtros['estado'] ?? '') !== '', fn ($q) => $q->where('estado_validacion', $filtros['estado']))
             ->when(($filtros['comunidad'] ?? '') !== '', fn ($q) => $q->where('comunidad_id', $filtros['comunidad']))
             ->latest()
             ->paginate(10, page: $page);
     }
 
-    public function componentesRequeridos(mixed $coordinacionId, string $trayecto): Collection
+    public function componentesRequeridos(mixed $programaId, string $trayecto): Collection
     {
-        if (! $this->usaComponentesDocumentales() || ! $coordinacionId || $trayecto === '') {
+        if (! $this->usaComponentesDocumentales() || ! $programaId || $trayecto === '') {
             return collect();
         }
 
-        return Componente::where('coordinacion_id', $coordinacionId)
+        return Componente::where('programa_id', $programaId)
             ->where('anio', $trayecto)
             ->where('estado_logico', true)
             ->get();
@@ -464,7 +501,6 @@ class ProyectoGestionService
             'tipos_publicacion' => Cache::remember('gestion_cat_tipos_publicacion', $ttl, fn() => TipoPublicacion::where('estado_logico', true)->get()),
             'tipos_investigacion' => Cache::remember('gestion_cat_tipos_investigacion', $ttl, fn() => TipoInvestigacion::where('estado_logico', true)->get()),
             'lapsos' => Cache::remember('gestion_cat_lapsos', $ttl, fn() => LapsoAcademico::activos()->orderByDesc('lap_codigo')->get()),
-            'coordinaciones' => Cache::remember('gestion_cat_coordinaciones', $ttl, fn() => app(ModuloRepositorioService::class)->coordinacionesActivas()),
         ];
     }
 
@@ -474,25 +510,14 @@ class ProyectoGestionService
      */
     protected function contextoEquipo(array $estado, string $cedula, bool $esAdmin): array
     {
-        $equiposDisp = collect();
+        $gruposSvc = app(GrupoProyectoService::class);
         $lapFiltro = ($estado['filterLapsoEquipo'] ?? '') !== ''
             ? (int) $estado['filterLapsoEquipo']
             : null;
 
-        $gruposSvc = app(GrupoProyectoService::class);
-        $filtrosEquipo = array_filter([
-            'lapso' => $lapFiltro,
-            'programa' => ($estado['filterProgramaEquipo'] ?? '') !== '' ? (int) $estado['filterProgramaEquipo'] : null,
-            'seccion' => ($estado['filterSeccionEquipo'] ?? '') !== '' ? (int) $estado['filterSeccionEquipo'] : null,
-        ]);
-
-        if ($cedula !== '') {
-            $equiposDisp = $gruposSvc->equiposDelEstudiante($cedula, $lapFiltro);
-        } elseif ($esAdmin && $gruposSvc->tablaDisponible()) {
-            $equiposDisp = $gruposSvc->listar($filtrosEquipo);
-        } else {
-            $equiposDisp = collect();
-        }
+        $equiposDisp = $gruposSvc->tablaDisponible()
+            ? $gruposSvc->listar(['lapso' => $lapFiltro])
+            : collect();
 
         $clave = $estado['equipo_seccion_clave'] ?? '';
         $equipoValidado = null;
