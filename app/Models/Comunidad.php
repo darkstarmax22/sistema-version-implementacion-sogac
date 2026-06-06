@@ -19,13 +19,7 @@ class Comunidad extends RepositorioModel
         'numero_telefono',
         'direccion',
         'dir_codigo',
-        'trayecto',
-        'programa',
-        'seccion',
         'anio',
-        'nombre_encargado',
-        'apellido_encargado',
-        'telefono_encargado',
     ];
 
     public function contactos()

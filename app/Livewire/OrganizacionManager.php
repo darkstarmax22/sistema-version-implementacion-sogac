@@ -218,9 +218,9 @@ class OrganizacionManager extends Component
             'correo'            => $this->org_correo ? trim($this->org_correo) : null,
             'direccion'         => $dirNueva,
             'cargo'             => $cargoNuevo,
-            'nombre_contacto'   => $this->org_nombre_contacto ? trim($this->org_nombre_contacto) : null,
-            'apellido_contacto' => $this->org_apellido_contacto ? trim($this->org_apellido_contacto) : null,
-            'numero_contacto'   => $this->org_numero_contacto ? trim($this->org_numero_contacto) : null,
+            'nombre_contacto'   => $this->org_nombre_contacto ? trim($this->org_nombre_contacto) : '-',
+            'apellido_contacto' => $this->org_apellido_contacto ? trim($this->org_apellido_contacto) : '-',
+            'numero_contacto'   => $this->org_numero_contacto ? trim($this->org_numero_contacto) : '-',
         ];
 
         if ($this->org_nombre_key) {

@@ -9,7 +9,7 @@ class ComunidadContacto extends Model
 {
     use HasFactory;
 
-    protected $primaryKey = 'ccon_codigo';
+    protected $primaryKey = 'ccom_codigo';
 
     protected $fillable = ['com_codigo', 'ccon_nombre', 'ccon_apellido', 'ccon_correo', 'ccon_telefono', 'ccon_cargo'];
 

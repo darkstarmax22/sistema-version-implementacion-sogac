@@ -45,9 +45,6 @@ return [
             'numero_telefono'   => 'com_numero_telefono',
             'direccion'         => 'com_direccion',
             'direccion_id'      => 'dir_codigo',
-            'nombre_encargado'  => 'com_nombre_encargado',
-            'apellido_encargado'=> 'com_apellido_encargado',
-            'telefono_encargado'=> 'com_telefono_encargado',
             'anio'              => 'anio',
         ],
     ],
@@ -99,6 +96,17 @@ return [
             'nombre' => 'tin_nombre',
             'descripcion' => 'tin_descripcion',
             'estado_logico' => 'tin_estado_logico',
+        ],
+    ],
+
+    'coordinaciones' => [
+        'primary_key' => 'coord_codigo',
+        'columns' => [
+            'id' => 'coord_codigo',
+            'nombre' => 'coord_nombre',
+            'descripcion' => 'coord_descripcion',
+            'activo' => 'coord_activo',
+            'alertar_comunidades' => 'coord_alertar_comunidades',
         ],
     ],
 

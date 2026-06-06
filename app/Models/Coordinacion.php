@@ -8,11 +8,10 @@ class Coordinacion extends RepositorioModel
 {
     use HasFactory;
 
-    protected $table = 'coordinaciones'; // Asumiendo que la tabla se llama 'coordinaciones'
+    protected $table = 'coordinaciones';
     protected $fillable = [
         'nombre',
-        'activo', // Asumiendo que tiene un campo 'activo'
+        'descripcion',
+        'activo',
     ];
-
-    // Puedes añadir relaciones o métodos adicionales aquí si son necesarios
 }

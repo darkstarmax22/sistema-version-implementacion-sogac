@@ -28,31 +28,13 @@ class ComunidadManager extends Component
 
     public string $prefijo_telefono = '0424';
 
-    public string $trayecto = '';
-
-    public string $programa = '';
-
-    public string $seccion = '';
-
     public string $estado_id = '';
 
     public string $municipio_id = '';
 
     public string $dir_nombre = '';
 
-    public string $nombre_encargado = '';
-
-    public string $apellido_encargado = '';
-
-    public string $telefono_encargado = '';
-
     public array $contactos = [];
-
-    public function updatedPrograma(): void
-    {
-        $this->seccion = '';
-        $this->trayecto = '';
-    }
 
     public function updatedEstadoId(): void
     {
@@ -113,7 +95,24 @@ class ComunidadManager extends Component
 
     public function agregarContacto(): void
     {
-        $this->contactos[] = ['nombre' => '', 'apellido' => '', 'correo' => '', 'correo_confirmacion' => '', 'prefijo' => '0424', 'telefono' => '', 'cargo' => ''];
+        $this->contactos[] = ['nombre' => '', 'apellido' => '', 'correo' => '', 'correo_confirmacion' => '', 'prefijo' => '0424', 'telefono' => '', 'cargo' => '', 'cargo_custom' => ''];
+    }
+
+    public function setCargoSeleccion(int $index): void
+    {
+        $this->contactos[$index]['cargo'] = '';
+        $this->contactos[$index]['cargo_custom'] = '';
+    }
+
+    private function normalizarContactos(): array
+    {
+        return array_map(function ($c) {
+            if (($c['cargo'] ?? '') === '__otro__') {
+                $c['cargo'] = trim($c['cargo_custom'] ?? '') ?: '';
+            }
+            unset($c['cargo_custom']);
+            return $c;
+        }, $this->contactos);
     }
 
     public function quitarContacto(int $index): void
@@ -167,14 +166,9 @@ class ComunidadManager extends Component
             return;
         }
 
-        $this->reset(['editingId', 'nombre', 'rif', 'correo', 'numero_telefono', 'prefijo_telefono', 'trayecto', 'programa', 'seccion', 'contactos', 'estado_id', 'municipio_id', 'dir_nombre', 'nombre_encargado', 'apellido_encargado', 'telefono_encargado']);
+        $this->reset(['editingId', 'nombre', 'rif', 'correo', 'numero_telefono', 'prefijo_telefono', 'contactos', 'estado_id', 'municipio_id', 'dir_nombre']);
         $this->prefijo_telefono = '0424';
         $this->resetValidation();
-
-        $cfg = auth()->user()?->profesorProyectoModulo();
-        if ($cfg && ! empty($cfg->ppm_anio)) {
-            $this->trayecto = (string) $cfg->ppm_anio;
-        }
 
         $this->viewMode = 'form';
         $this->dispatch('refresh-icons');
@@ -191,10 +185,6 @@ class ComunidadManager extends Component
         $datos = $gestion->cargarParaEdicion($id);
         $this->editingId = $id;
         $this->fill($datos);
-
-        $this->nombre_encargado = $datos['nombre_encargado'] ?? '';
-        $this->apellido_encargado = $datos['apellido_encargado'] ?? '';
-        $this->telefono_encargado = $datos['telefono_encargado'] ?? '';
 
         $telefonoCompleto = $datos['numero_telefono'];
         $prefijos = ['0424', '0414', '0412', '0422', '0416', '0426'];
@@ -251,10 +241,7 @@ class ComunidadManager extends Component
             'estado_id' => $this->estado_id,
             'municipio_id' => $this->municipio_id,
             'dir_nombre' => $this->dir_nombre,
-            'trayecto' => $this->trayecto,
-            'programa' => $this->programa,
-            'seccion' => $this->seccion,
-            'contactos' => $this->contactos,
+            'contactos' => $this->normalizarContactos(),
         ]);
 
         if ($this->editingId === null) {
@@ -290,13 +277,7 @@ class ComunidadManager extends Component
             'estado_id' => $this->estado_id,
             'municipio_id' => $this->municipio_id,
             'dir_nombre' => $this->dir_nombre,
-            'trayecto' => $this->trayecto,
-            'programa' => $this->programa,
-            'seccion' => $this->seccion,
-            'contactos' => $this->contactos,
-            'nombre_encargado' => $this->nombre_encargado ?: '-',
-            'apellido_encargado' => $this->apellido_encargado ?: '-',
-            'telefono_encargado' => $this->telefono_encargado ?: '-',
+            'contactos' => $this->normalizarContactos(),
         ]);
 
         session()->flash('message', 'Comunidad guardada correctamente.');
@@ -327,7 +308,7 @@ class ComunidadManager extends Component
             'search' => trim($this->search),
         ], $this->getPage());
 
-        $formulario = $gestion->datosVistaFormulario($this->programa, $this->estado_id);
+        $formulario = $gestion->datosVistaFormulario($this->estado_id);
 
         return array_merge($listado, $formulario, [
             'puedeGestionar' => $this->puedeGestionar(),

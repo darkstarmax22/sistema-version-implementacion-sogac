@@ -19,6 +19,7 @@ class User extends Authenticatable
     protected $keyType = 'string';
     public $incrementing = false;
     public $timestamps = false;
+    protected $guarded = ['*'];
 
     /** @var array<string, bool> */
     protected static array $equiposExistsCache = [];

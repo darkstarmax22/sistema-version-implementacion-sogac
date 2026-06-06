@@ -21,6 +21,6 @@ class ProyectoPublicado extends RepositorioModel
 
     public function comentarios()
     {
-        return $this->hasMany(ComentarioProyecto::class, 'pry_codigo', 'proyecto_id');
+        return $this->hasMany(ComentarioProyecto::class, 'proyecto_id', 'proyecto_id');
     }
 }

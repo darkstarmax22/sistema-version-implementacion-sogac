@@ -94,13 +94,10 @@
                 <thead>
                     <tr style="background-color: #8bb2b7; color: #000; font-weight: bold;">
                         <th width="4%">N°</th>
-                        <th width="25%">Comunidad / dirección</th>
+                        <th width="30%">Comunidad / dirección</th>
                         <th width="11%">RIF</th>
-                        <th width="12%">Contacto</th>
-                        <th width="10%">Programa</th>
-                        <th width="8%">Secc.</th>
-                        <th width="8%">Trayecto</th>
-                        <th width="12%">Personas contacto</th>
+                        <th width="15%">Contacto</th>
+                        <th width="16%">Personas contacto</th>
                         <th width="10%">Acciones</th>
                     </tr>
                 </thead>
@@ -115,9 +112,6 @@
                             </td>
                             <td align="center">{{ $c->rif }}</td>
                             <td align="center">{{ $c->correo }}<br><b>{{ $c->numero_telefono }}</b></td>
-                            <td align="center" style="font-size:10px;">{{ $programasMap[$c->programa] ?? $c->programa ?? '-' }}</td>
-                            <td align="center">{{ trim($seccionesMap[$c->seccion] ?? $c->seccion ?? '-') }}</td>
-                            <td align="center">{{ $c->trayecto ?? '-' }}</td>
                             <td style="font-size:10px;">
                                 @if ($c->relationLoaded('contactos') && $c->contactos->isNotEmpty())
                                     @foreach ($c->contactos as $ct)
@@ -150,7 +144,7 @@
                     @endforeach
                     @if ($comunidades->isEmpty())
                         <tr>
-                            <td colspan="9" align="center" style="padding: 20px;">No hay comunidades registradas.
+                            <td colspan="6" align="center" style="padding: 20px;">No hay comunidades registradas.
                             </td>
                         </tr>
                     @endif
@@ -225,60 +219,6 @@
                                     <span style="color:red;font-size:10px; display: block; margin-top: 2px;">{{ $message }}</span>
                                 @enderror
                                 @error('numero_telefono')
-                                    <span style="color:red;font-size:10px; display: block; margin-top: 2px;">{{ $message }}</span>
-                                @enderror
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="vertical-align: top; padding: 0 4px 10px 0;">
-                        <div style="display: flex; align-items: flex-start; gap: 6px;">
-                            <b style="white-space: nowrap; padding-top: 8px; min-width: 60px;">Programa:</b>
-                            <div style="flex: 1;">
-                                <select wire:model.live="programa" style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; background: #fff; font-size: 11px;">
-                                    <option value="">-- Seleccione programa --</option>
-                                    @foreach ($programas as $p)
-                                        <option value="{{ $p->pro_codigo }}">{{ $p->pro_nombre }}</option>
-                                    @endforeach
-                                </select>
-                                @error('programa')
-                                    <span style="color:red;font-size:10px; display: block; margin-top: 2px;">{{ $message }}</span>
-                                @enderror
-                            </div>
-                        </div>
-                    </td>
-                    <td style="vertical-align: top; padding: 0 0 10px 4px;">
-                        <div style="display: flex; align-items: flex-start; gap: 6px;">
-                            <b style="white-space: nowrap; padding-top: 8px; min-width: 60px;">Sección:</b>
-                            <div style="flex: 1;">
-                                <select wire:model="seccion" style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; background: #fff; font-size: 11px;">
-                                    <option value="">-- Seleccione sección --</option>
-                                    @foreach ($secciones as $s)
-                                        <option value="{{ $s->sec_codigo }}">{{ $s->sec_nombre }}</option>
-                                    @endforeach
-                                </select>
-                                @error('seccion')
-                                    <span style="color:red;font-size:10px; display: block; margin-top: 2px;">{{ $message }}</span>
-                                @enderror
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="2" style="padding: 0 0 10px 0;">
-                        <div style="display: flex; align-items: flex-start; gap: 6px;">
-                            <b style="white-space: nowrap; padding-top: 8px; min-width: 145px;">Año / trayecto ref.:</b>
-                            <div style="flex: 1;">
-                                <select wire:model="trayecto" style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; background: #fff; font-size: 11px;">
-                                    <option value="">-- Seleccione (opcional) --</option>
-                                    @foreach ($trayectos as $t)
-                                        <option value="{{ $t->tra_nombre }}">
-                                            {{ in_array($t->tra_nombre, ['I', 'II', 'III', 'IV', 'V']) ? 'Trayecto ' . $t->tra_nombre : $t->tra_nombre }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                @error('trayecto')
                                     <span style="color:red;font-size:10px; display: block; margin-top: 2px;">{{ $message }}</span>
                                 @enderror
                             </div>
@@ -387,12 +327,22 @@
 
                                 <div>
                                     <label style="display: block; font-weight: bold; margin-bottom: 4px; color: #000;">Cargo:</label>
-                                    <select wire:model="contactos.{{ $i }}.cargo" style="width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; box-sizing: border-box;">
-                                        <option value="">-- Seleccione cargo --</option>
-                                        @foreach (config('comunidades.cargos_contacto', []) as $key => $label)
-                                            <option value="{{ $key }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
+                                    @if (($contactos[$i]['cargo'] ?? '') === '__otro__')
+                                        <div style="display: flex; gap: 4px; align-items: center;">
+                                            <input wire:model="contactos.{{ $i }}.cargo_custom" type="text" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; box-sizing: border-box;" placeholder="Escriba el cargo...">
+                                            <button type="button" wire:click="setCargoSeleccion({{ $i }})" style="padding: 6px 10px; border: 1px solid #aaa; border-radius: 4px; background: #f4f4f4; cursor: pointer; font-size: 11px; white-space: nowrap;">⇦ Volver</button>
+                                        </div>
+                                    @else
+                                        <div style="display: flex; gap: 4px; align-items: center;">
+                                            <select wire:model="contactos.{{ $i }}.cargo" style="flex: 1; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; box-sizing: border-box;">
+                                                <option value="">-- Seleccione cargo --</option>
+                                                @foreach (config('comunidades.cargos_contacto', []) as $key => $label)
+                                                    <option value="{{ $key }}">{{ $label }}</option>
+                                                @endforeach
+                                                <option value="__otro__">+ Otro (escribir)...</option>
+                                            </select>
+                                        </div>
+                                    @endif
                                     @error('contactos.' . $i . '.cargo')
                                         <span style="color:red; font-size:10px; display: block; margin-top: 3px;">{{ $message }}</span>
                                     @enderror
@@ -453,22 +403,6 @@
                         </div>
                     @endforeach
                 @endif
-            </div>
-
-            <div style="margin-top: 25px; border-top: 2px solid #8b0000; padding-top: 20px;">
-                <h4 style="margin: 0 0 15px; font-size: 14px; font-weight: bold; color: #8b0000; font-style: italic;">Encargado Principal</h4>
-                <table width="100%" border="0" cellpadding="4" cellspacing="0" style="font-size: 11px;">
-                    <tr>
-                        <td width="15%"><b>Nombre:</b></td>
-                        <td width="35%"><input wire:model="nombre_encargado" type="text" style="width: 90%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px;"></td>
-                        <td width="15%"><b>Apellido:</b></td>
-                        <td width="35%"><input wire:model="apellido_encargado" type="text" style="width: 90%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px;"></td>
-                    </tr>
-                    <tr>
-                        <td><b>Teléfono:</b></td>
-                        <td colspan="3"><input wire:model="telefono_encargado" type="text" style="width: 45%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px;" placeholder="0424-1234567"></td>
-                    </tr>
-                </table>
             </div>
 
             <div style="margin-top: 15px; text-align: center;">

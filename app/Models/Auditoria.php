@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Schema;
 class Auditoria extends Model
 {
     protected $table = 'auditorias';
-    protected $fillable = ['persona_id', 'accion', 'modulo', 'ip', 'user_agent'];
+    protected $primaryKey = 'aud_codigo';
+    protected $fillable = ['pry_codigo', 'aud_accion', 'aud_modulo', 'ip', 'aud_user_agent'];
 
     public function user()
     {
